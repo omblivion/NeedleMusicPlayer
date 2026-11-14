@@ -12,8 +12,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.ToNumberPolicy;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonPrimitive;
 import com.poupa.vinylmusicplayer.R;
 import com.poupa.vinylmusicplayer.util.OopsHandler;
 import com.poupa.vinylmusicplayer.util.PreferenceUtil;
@@ -23,7 +24,8 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Set;
 
 public class SharedPreferencesImporter extends AppCompatActivity {
 
@@ -54,60 +56,78 @@ public class SharedPreferencesImporter extends AppCompatActivity {
     }
 
     private void importSettings(Uri location) {
-        // Prepare the table used to store the lines
-        Map<String, ?> preferences;
-        Gson gson = new GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE).create();
-        SharedPreferences.Editor spEditor = sharedPreferences.edit();
-
-        try {
-            // Try to open the file
-            ParcelFileDescriptor file = this.context.getContentResolver().openFileDescriptor(location, "r") ;
-            if(file == null) return;
-
-            // Read the content from the file line by line
-            BufferedReader reader = new BufferedReader(new FileReader(file.getFileDescriptor()));
-            preferences = gson.fromJson(reader, Map.class);
-
-            String fileFormat = (String) preferences.get(PreferenceUtil.FILE_FORMAT);
-            int savedPrefsVersionCode = Math.toIntExact((Long) preferences.get(PreferenceUtil.VERSION_CODE));
-
-            // Checks whether the file format saved in the preferences file is compatible with the current settings parser.
-            if(Objects.equals(fileFormat, CURRENT_FILE_FORMAT)) {
-                // Checks whether the version of the app and the saved settings are compatible.
-                if(MIN_COMPATIBLE_VERSION <= savedPrefsVersionCode && savedPrefsVersionCode <= MAX_COMPATIBLE_VERSION) {
-                    for (Map.Entry<String, ?> entry : preferences.entrySet()) {
-                        if (Objects.equals(entry.getKey(), PreferenceUtil.FILE_FORMAT) || Objects.equals(entry.getKey(), PreferenceUtil.VERSION_CODE)) continue;
-
-                        Object object = entry.getValue();
-                        String key = entry.getKey();
-                        if (object instanceof String) {
-                            spEditor.putString(key, (String) object);
-                        } else if (object instanceof Long) {
-                            spEditor.putInt(key, Math.toIntExact((Long) object));
-                        } else if (object instanceof Boolean) {
-                            spEditor.putBoolean(key, (Boolean) object);
-                        } else if (object instanceof Float) {
-                            spEditor.putFloat(key, (Float) object);
-                        }
-                    }
-                    reader.close();
-                    file.close();
-                } else {
-                    // Future version of the app needs to come back here and provide importer/converter code
-                    SafeToast.show(this.context, R.string.unsupported_saved_pref_version);
-                }
-
-            } else {
-                // Future version of the app needs to come back here and provide importer/converter code
-                SafeToast.show(this.context, R.string.unsupported_saved_pref_format);
+        try (ParcelFileDescriptor file = context.getContentResolver().openFileDescriptor(location, "r")) {
+            if (file == null) throw new IOException("Could not open settings");
+            JsonObject document;
+            try (BufferedReader reader = new BufferedReader(new FileReader(file.getFileDescriptor()))) {
+                document = new Gson().fromJson(reader, JsonObject.class);
             }
-        }
-        catch(IOException exception) {
-            // An error happened while reading the file
+            if (document == null) throw new IllegalArgumentException("Empty settings");
+            if (!CURRENT_FILE_FORMAT.equals(document.get(PreferenceUtil.FILE_FORMAT).getAsString())) {
+                SafeToast.show(this.context, R.string.unsupported_saved_pref_format);
+                return;
+            }
+            int version = document.get(PreferenceUtil.VERSION_CODE).getAsBigDecimal().intValueExact();
+            if (version < MIN_COMPATIBLE_VERSION || version > MAX_COMPATIBLE_VERSION) {
+                SafeToast.show(context, R.string.unsupported_saved_pref_version);
+                return;
+            }
+            Map<String, Object> incoming = new HashMap<>();
+            for (Map.Entry<String, JsonElement> entry : document.entrySet()) {
+                incoming.put(entry.getKey(), entry.getValue());
+            }
+            // Validate the whole backup before obtaining an editor: no partial imports.
+            Map<String, Object> validated = new HashMap<>();
+            for (Map.Entry<String, Object> entry : PreferenceUtil.reducePreferencesToDeclared(
+                    incoming, key -> key.isExportImportable).entrySet()) {
+                String key = entry.getKey();
+                if (key.equals(PreferenceUtil.FILE_FORMAT) || key.equals(PreferenceUtil.VERSION_CODE)
+                        || key.equals(PreferenceUtil.VERSION_NAME)) continue;
+                JsonPrimitive value = ((JsonElement) entry.getValue()).getAsJsonPrimitive();
+                if (FLOAT_KEYS.contains(key)) {
+                    if (!value.isNumber()) throw new IllegalArgumentException("Expected number: " + key);
+                    float number = value.getAsFloat();
+                    if (Float.isInfinite(number) || Float.isNaN(number)) throw new IllegalArgumentException("Invalid number: " + key);
+                    validated.put(key, number);
+                } else if (INT_KEYS.contains(key)) {
+                    if (!value.isNumber()) throw new IllegalArgumentException("Expected integer: " + key);
+                    validated.put(key, value.getAsBigDecimal().intValueExact());
+                } else if (STRING_KEYS.contains(key)) {
+                    if (!value.isString()) throw new IllegalArgumentException("Expected string: " + key);
+                    validated.put(key, value.getAsString());
+                } else {
+                    if (!value.isBoolean()) throw new IllegalArgumentException("Expected boolean: " + key);
+                    validated.put(key, value.getAsBoolean());
+                }
+            }
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            for (Map.Entry<String, Object> entry : validated.entrySet()) {
+                Object value = entry.getValue();
+                String key = entry.getKey();
+                if (value instanceof Float) editor.putFloat(key, (Float) value);
+                else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+                else if (value instanceof String) editor.putString(key, (String) value);
+                else editor.putBoolean(key, (Boolean) value);
+            }
+            editor.apply();
+        } catch (IOException | RuntimeException exception) {
             SafeToast.show(this.context, R.string.cannot_import_settings);
             OopsHandler.collectStackTrace(exception);
         }
-        spEditor.apply();
     }
 
+    private static final Set<String> FLOAT_KEYS = Set.of(
+            PreferenceUtil.RG_PREAMP_WITH_TAG, PreferenceUtil.RG_PREAMP_WITHOUT_TAG);
+    private static final Set<String> INT_KEYS = Set.of(
+            PreferenceUtil.PRIMARY_COLOR, PreferenceUtil.ACCENT_COLOR,
+            PreferenceUtil.NOW_PLAYING_SCREEN_ID, PreferenceUtil.ENQUEUE_SONGS_DEFAULT_CHOICE,
+            "last_start_page", "last_music_chooser", "last_sleep_timer_value",
+            "album_grid_size", "album_grid_size_land", "song_grid_size", "song_grid_size_land",
+            "artist_grid_size", "artist_grid_size_land", "SHUFFLE_MODE", "REPEAT_MODE");
+    private static final Set<String> STRING_KEYS = Set.of(
+            PreferenceUtil.GENERAL_THEME, PreferenceUtil.AUTO_DOWNLOAD_IMAGES_POLICY,
+            PreferenceUtil.LIBRARY_CATEGORIES, PreferenceUtil.THEME_STYLE, PreferenceUtil.RG_SOURCE_MODE_V2,
+            "start_directory", "artist_sort_order", "album_sort_order", "song_sort_order", "file_sort_order",
+            "last_added_sort_order", "not_recently_played_sort_order",
+            "last_added_interval_v2", "recently_played_interval_v2", "not_recently_played_interval_v2");
 }

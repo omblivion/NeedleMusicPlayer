@@ -369,7 +369,18 @@ public class Discography implements MusicServiceEventListener {
     }
 
     SyncWithMediaStoreAsyncTask.Progress syncWithMediaStore(@NonNull final Consumer<SyncWithMediaStoreAsyncTask.Progress> progressUpdater) {
+        return syncWithMediaStore(progressUpdater, false);
+    }
+
+    SyncWithMediaStoreAsyncTask.Progress syncWithMediaStore(@NonNull final Consumer<SyncWithMediaStoreAsyncTask.Progress> progressUpdater, boolean reset) {
         final Context context = App.getInstance().getApplicationContext();
+        // A failed query must never be mistaken for an empty library, even on reset.
+        final ArrayList<Song> alienSongs = MediaStoreBridge.getAllSongs(context);
+        if (reset) {
+            synchronized (cache) {
+                clear();
+            }
+        }
 
         // Zombies are tracks that are removed but still indexed by MediaStore
         final Predicate<Song> isZombie = (s) -> !(new File(s.data)).exists();
@@ -394,7 +405,6 @@ public class Discography implements MusicServiceEventListener {
         };
 
         final SyncWithMediaStoreAsyncTask.Progress counters = new SyncWithMediaStoreAsyncTask.Progress();
-        final ArrayList<Song> alienSongs = MediaStoreBridge.getAllSongs(context);
         final Set<Long> importedSongIds = new HashSet<>();
         for (final Song song : alienSongs) {
             if (isNotWhiteListed.test(song)) continue;

@@ -147,8 +147,15 @@ public class MusicPlaybackQueueStore extends SQLiteOpenHelper {
     }
 
     public synchronized void saveQueues(@NonNull final ArrayList<IndexedSong> playingQueue, @NonNull final ArrayList<IndexedSong> originalPlayingQueue) {
-        saveQueue(PLAYING_QUEUE_TABLE_NAME, playingQueue);
-        saveQueue(ORIGINAL_PLAYING_QUEUE_TABLE_NAME, originalPlayingQueue);
+        final SQLiteDatabase database = getWritableDatabase();
+        database.beginTransaction();
+        try {
+            saveQueue(database, PLAYING_QUEUE_TABLE_NAME, playingQueue);
+            saveQueue(database, ORIGINAL_PLAYING_QUEUE_TABLE_NAME, originalPlayingQueue);
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
     }
 
     /**
@@ -157,37 +164,14 @@ public class MusicPlaybackQueueStore extends SQLiteOpenHelper {
      *
      * @param queue the queue to save
      */
-    private synchronized void saveQueue(final String tableName, @NonNull final ArrayList<IndexedSong> queue) {
-        final SQLiteDatabase database = getWritableDatabase();
-        database.beginTransaction();
-
-        try {
-            database.delete(tableName, null, null);
-            database.setTransactionSuccessful();
-        } finally {
-            database.endTransaction();
-        }
-
-        final int NUM_PROCESS = 20;
-        int position = 0;
-        while (position < queue.size()) {
-            database.beginTransaction();
-            try {
-                for (int i = position; i < queue.size() && i < position + NUM_PROCESS; i++) {
-                    Song song = queue.get(i);
-                    int indexInQueue = queue.get(i).index;
-                    ContentValues values = new ContentValues();
-
-                    values.put(BaseColumns._ID, song.id);
-                    values.put(MusicPlaybackColumns.INDEX_IN_QUEUE, indexInQueue);
-
-                    database.insert(tableName, null, values);
-                }
-                database.setTransactionSuccessful();
-            } finally {
-                database.endTransaction();
-                position += NUM_PROCESS;
-            }
+    private void saveQueue(@NonNull final SQLiteDatabase database, final String tableName,
+                           @NonNull final ArrayList<IndexedSong> queue) {
+        database.delete(tableName, null, null);
+        for (IndexedSong song : queue) {
+            ContentValues values = new ContentValues();
+            values.put(BaseColumns._ID, song.id);
+            values.put(MusicPlaybackColumns.INDEX_IN_QUEUE, song.index);
+            database.insertOrThrow(tableName, null, values);
         }
     }
 

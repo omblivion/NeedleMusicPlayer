@@ -11,6 +11,8 @@ import androidx.annotation.Nullable;
 import com.poupa.vinylmusicplayer.R;
 import com.poupa.vinylmusicplayer.ui.activities.base.AbsMusicServiceActivity;
 import com.poupa.vinylmusicplayer.util.MusicUtil;
+import com.poupa.vinylmusicplayer.util.OopsHandler;
+import com.poupa.vinylmusicplayer.util.SafeToast;
 
 /**
  * @author SC (soncaokim)
@@ -60,8 +62,12 @@ class SyncWithMediaStoreAsyncTask extends AsyncTask<Void, SyncWithMediaStoreAsyn
 
     @Override
     protected Progress doInBackground(final Void...params) {
-        if (resetRequested) discography.clear();
-        return discography.syncWithMediaStore(this::publishProgress);
+        try {
+            return discography.syncWithMediaStore(this::publishProgress, resetRequested);
+        } catch (RuntimeException error) {
+            OopsHandler.collectStackTrace(error);
+            return null;
+        }
     }
 
     @Override
@@ -89,6 +95,9 @@ class SyncWithMediaStoreAsyncTask extends AsyncTask<Void, SyncWithMediaStoreAsyn
 
     private void onTermination(@Nullable final Progress value) {
         discography.setCacheState(MemCache.ConsistencyState.OK);
+        if (value == null && !isCancelled()) {
+            SafeToast.show(context, R.string.library_scan_failed);
+        }
         if (isUIFeedbackNeeded()) {
             if (value == null || value.isEmpty()) {
                 snackbar.dismiss();

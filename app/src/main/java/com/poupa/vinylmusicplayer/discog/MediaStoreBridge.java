@@ -10,7 +10,6 @@ import androidx.annotation.Nullable;
 
 import com.poupa.vinylmusicplayer.discog.tagging.MultiValuesTagUtil;
 import com.poupa.vinylmusicplayer.model.Song;
-import com.poupa.vinylmusicplayer.util.OopsHandler;
 import com.poupa.vinylmusicplayer.util.PreferenceUtil;
 
 import java.util.ArrayList;
@@ -40,6 +39,9 @@ public class MediaStoreBridge {
     @NonNull
     public static ArrayList<Song> getAllSongs(@NonNull Context context) {
         try (Cursor cursor = makeSongCursor(context)) {
+            if (cursor == null) {
+                throw new IllegalStateException("MediaStore query returned no cursor");
+            }
             return getSongs(cursor);
         }
     }
@@ -84,17 +86,12 @@ public class MediaStoreBridge {
 
     @Nullable
     private static Cursor makeSongCursor(@NonNull final Context context) {
-        try {
-            return context.getContentResolver().query(
+        return context.getContentResolver().query(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     BASE_PROJECTION,
                     BASE_SELECTION,
                     null,
                     PreferenceUtil.getInstance().getSongSortOrder()
-            );
-        } catch (final RuntimeException e) {
-            OopsHandler.collectStackTrace(e);
-            return null;
-        }
+        );
     }
 }
