@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="top_window_all_time">Tutto il periodo</string>
+    <string name="top_window_year">1 anno</string>
+    <string name="top_window_52_weeks">52 settimane</string>
+    <string name="top_window_6_months">6 mesi</string>
+    <string name="top_window_4_months">4 mesi</string>
+    <string name="top_window_3_months">3 mesi</string>
+    <string name="top_window_2_months">2 mesi</string>
+    <string name="top_window_30_days">30 giorni</string>
+    <string name="top_window_7_days">7 giorni</string>
+    <string name="top_window_24_hours">24 ore</string>
+</resources>
