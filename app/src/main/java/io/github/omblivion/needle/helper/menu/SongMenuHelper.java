@@ -11,6 +11,7 @@ import androidx.fragment.app.FragmentActivity;
 
 import io.github.omblivion.needle.R;
 import io.github.omblivion.needle.dialogs.AddToPlaylistDialog;
+import io.github.omblivion.needle.dialogs.ResetPlayCountsDialog;
 import io.github.omblivion.needle.dialogs.SongDetailDialog;
 import io.github.omblivion.needle.dialogs.helper.DeleteSongsHelper;
 import io.github.omblivion.needle.helper.MusicPlayerRemote;
@@ -67,6 +68,11 @@ public class SongMenuHelper {
             return true;
         } else if (menuItemId == R.id.action_go_to_artist) {
             NavigationUtil.goToArtist(activity, song.getArtistNames());
+            return true;
+        } else if (menuItemId == R.id.action_reset_play_count) {
+            if (song.id != -1) {
+                ResetPlayCountsDialog.create(song).show(activity.getSupportFragmentManager(), "RESET_PLAY_COUNTS");
+            }
             return true;
         }
         return false;

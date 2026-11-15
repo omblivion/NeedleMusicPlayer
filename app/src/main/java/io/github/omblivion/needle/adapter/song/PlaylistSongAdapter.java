@@ -24,9 +24,17 @@ import java.util.ArrayList;
  */
 public class PlaylistSongAdapter extends AbsOffsetSongAdapter {
 
+    private final boolean isTopTracks;
+
     public PlaylistSongAdapter(@NonNull final AbsThemeActivity activity, @NonNull ArrayList<Song> dataSet, boolean usePalette,
                                @Nullable PaletteColorHolder palette) {
+        this(activity, dataSet, usePalette, palette, false);
+    }
+
+    public PlaylistSongAdapter(@NonNull final AbsThemeActivity activity, @NonNull ArrayList<Song> dataSet, boolean usePalette,
+                               @Nullable PaletteColorHolder palette, boolean isTopTracks) {
         super(activity, dataSet, usePalette, palette, false);
+        this.isTopTracks = isTopTracks;
         setMultiSelectMenuRes(R.menu.menu_cannot_delete_single_songs_playlist_songs_selection);
     }
 
@@ -87,6 +95,9 @@ public class PlaylistSongAdapter extends AbsOffsetSongAdapter {
 
         @Override
         protected int getSongMenuRes() {
+            if (isTopTracks) {
+                return R.menu.menu_item_top_track;
+            }
             return R.menu.menu_item_cannot_delete_single_songs_playlist_song;
         }
 

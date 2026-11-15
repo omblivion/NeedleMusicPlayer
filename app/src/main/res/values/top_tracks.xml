@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="pref_title_top_tracks_window">Most played period</string>
+    <string name="action_reset_play_count">Reset play count</string>
+    <string name="reset_play_counts_title">Reset play count</string>
+    <string name="reset_play_counts_message">This song\'s play history will be cleared from every most-played period. Its audio and playlists are not affected.</string>
     <string name="top_window_all_time">All time</string>
     <string name="top_window_year">1 year</string>
     <string name="top_window_52_weeks">52 weeks</string>

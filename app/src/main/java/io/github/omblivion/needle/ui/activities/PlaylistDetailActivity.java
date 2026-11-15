@@ -35,6 +35,7 @@ import io.github.omblivion.needle.misc.WrappedAsyncTaskLoader;
 import io.github.omblivion.needle.model.AbsCustomPlaylist;
 import io.github.omblivion.needle.model.Playlist;
 import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.model.TopTracksWindow;
 import io.github.omblivion.needle.model.smartplaylist.AbsSmartPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.LastAddedPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.NotRecentlyPlayedPlaylist;
@@ -109,7 +110,8 @@ public class PlaylistDetailActivity
             public int getPaletteColor() {return ThemeStore.primaryColor(PlaylistDetailActivity.this);}
         };
         if (playlist instanceof AbsCustomPlaylist) {
-            adapter = new PlaylistSongAdapter(this, new ArrayList<>(), false, holder);
+            adapter = new PlaylistSongAdapter(this, new ArrayList<>(), false, holder,
+                    playlist instanceof io.github.omblivion.needle.model.smartplaylist.MyTopTracksPlaylist);
             layoutBinding.recyclerView.setAdapter(adapter);
         } else {
             recyclerViewDragDropManager = new RecyclerViewDragDropManager();
@@ -152,6 +154,12 @@ public class PlaylistDetailActivity
         setToolbarTitle(null);
         layoutBinding.title.setText(playlist.name);
         layoutBinding.title.setTextColor(MaterialValueHelper.getPrimaryTextColor(this, ColorUtil.isColorLight(ThemeStore.primaryColor(this))));
+
+        // Make the selected most-played period visible on the top-tracks list.
+        if (playlist instanceof io.github.omblivion.needle.model.smartplaylist.MyTopTracksPlaylist) {
+            TopTracksWindow window = PreferenceUtil.getInstance().getTopTracksWindow();
+            setToolbarTitle(getString(window.labelRes));
+        }
     }
 
     private void setToolbarTitle(final String title) {
@@ -225,6 +233,14 @@ public class PlaylistDetailActivity
 
         // give the adapter a chance to update the decoration
         adapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void onStatisticsChanged() {
+        super.onStatisticsChanged();
+
+        // A reset (or a new play) changed the most-played statistics.
+        reload();
     }
 
     @Override
