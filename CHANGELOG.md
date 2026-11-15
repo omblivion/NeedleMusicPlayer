@@ -1,6 +1,26 @@
 # Changelog
 
-## Needle [0.0.1] - 2026-11-13 — Test pre-release
+## Needle [0.1.0] - 2026-11-15 - First stable release
+
+First stable Needle release. Needle is an independent local music player for
+Android 14 and newer, forked from Vinyl Music Player.
+
+### Features
+
+- Independent Needle identity: application id `io.github.omblivion.needle` and package rename.
+- Configurable most-played period: All time, 1 year, 52 weeks (default), 6/4/3/2 months, 30 days, 7 days and 24 hours, ranked by real play counts.
+- Reset a song's play count from the most-played list, with confirmation. Reset clears that song's history across every period and does not touch audio, playlists, recent history or playback.
+- Play statistics migrated to a new database schema that preserves existing weekly counts.
+- Android 14-17 foundation: compile/target SDK 37, minimum SDK 34, foreground media playback service type.
+
+### Fixes
+
+- Isolate preload errors and safely replace edited audio.
+- Preserve library and settings on failures and save queues atomically.
+- Preserve queue occurrences and prepared positions through edits.
+- Handle picker cancellation and enforce lint compatibility checks.
+
+## Needle [0.0.1] - 2026-11-13 - Test pre-release
 
 First experimental Needle build, focused on restoring maintenance and fixing the inherited Android compatibility baseline. This is not a stable release and does not resolve the entire backlog.
 
