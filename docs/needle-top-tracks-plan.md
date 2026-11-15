@@ -47,12 +47,12 @@ Retain the current more-than-half-duration listening qualification.
 
 ## Tasks / ledger
 
-- [ ] Preset/cutoff tests RED→GREEN.
-- [ ] Migration, raw ranking, dated windows, idempotence, reset and retention tests.
-- [ ] Playback-session integration and reset-race tests.
-- [ ] Settings persistence/import/export and loader integration.
-- [ ] Context-only menu/confirmation/reset and refresh tests.
-- [ ] Full suite, all six lint variants, debug/release APKs and independent review.
+- [x] Preset/cutoff tests RED→GREEN.
+- [x] Migration, raw ranking, dated windows, idempotence, reset and retention tests.
+- [x] Playback-session integration and reset-race tests.
+- [x] Settings persistence/import/export and loader integration.
+- [x] Context-only menu/confirmation/reset and refresh tests.
+- [x] Full suite, all six lint variants, debug/release APKs and independent review.
 
 ## Review focus
 
