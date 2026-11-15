@@ -28,17 +28,17 @@
     and lower if app is build for android 11 or up (>= 30, aka VERSION_CODES.R)
     => https://developer.android.com/training/data-storage/use-cases#opt-out-in-production-app -->
     <application
-        android:name="com.poupa.vinylmusicplayer.App"
+        android:name="io.github.omblivion.needle.App"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VinylMusicPlayer.Light"
+        android:theme="@style/Theme.NeedleMusicPlayer.Light"
         android:resizeableActivity="true"
         tools:ignore="UnusedAttribute"
         android:fullBackupOnly="true">
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.MainActivity"
+        <activity android:name="io.github.omblivion.needle.ui.activities.MainActivity"
             android:theme="@style/SplashTheme"
             android:label="@string/app_short_name"
             android:exported="true">
@@ -112,42 +112,42 @@
                 <data android:mimeType="vnd.android.cursor.dir/audio" />
             </intent-filter>
         </activity>
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.AlbumDetailActivity" />
-        <activity android:name="com.poupa.vinylmusicplayer.preferences.SharedPreferencesExporter" />
-        <activity android:name="com.poupa.vinylmusicplayer.preferences.SharedPreferencesImporter" />
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.ArtistDetailActivity" />
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.GenreDetailActivity" />
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.PlaylistDetailActivity" />
+        <activity android:name="io.github.omblivion.needle.ui.activities.AlbumDetailActivity" />
+        <activity android:name="io.github.omblivion.needle.preferences.SharedPreferencesExporter" />
+        <activity android:name="io.github.omblivion.needle.preferences.SharedPreferencesImporter" />
+        <activity android:name="io.github.omblivion.needle.ui.activities.ArtistDetailActivity" />
+        <activity android:name="io.github.omblivion.needle.ui.activities.GenreDetailActivity" />
+        <activity android:name="io.github.omblivion.needle.ui.activities.PlaylistDetailActivity" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.tageditor.SongTagEditorActivity"
+            android:name="io.github.omblivion.needle.ui.activities.tageditor.SongTagEditorActivity"
             android:windowSoftInputMode="adjustResize" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.tageditor.AlbumTagEditorActivity"
+            android:name="io.github.omblivion.needle.ui.activities.tageditor.AlbumTagEditorActivity"
             android:windowSoftInputMode="adjustResize" />
-        <activity android:name="com.poupa.vinylmusicplayer.ui.activities.SearchActivity" />
+        <activity android:name="io.github.omblivion.needle.ui.activities.SearchActivity" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.SettingsActivity"
+            android:name="io.github.omblivion.needle.ui.activities.SettingsActivity"
             android:label="@string/action_settings" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.AboutActivity"
+            android:name="io.github.omblivion.needle.ui.activities.AboutActivity"
             android:label="@string/action_about" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.intro.AppIntroActivity"
+            android:name="io.github.omblivion.needle.ui.activities.intro.AppIntroActivity"
             android:label="@string/intro_label"
             android:theme="@style/Theme.Intro" />
         <activity
             android:name=".ui.activities.saf.SAFGuideActivity"
             android:theme="@style/Theme.Intro"/>
         <activity
-            android:name="com.poupa.vinylmusicplayer.ui.activities.bugreport.BugReportActivity"
+            android:name="io.github.omblivion.needle.ui.activities.bugreport.BugReportActivity"
             android:label="@string/report_an_issue" />
         <activity
-            android:name="com.poupa.vinylmusicplayer.appshortcuts.AppShortcutLauncherActivity"
+            android:name="io.github.omblivion.needle.appshortcuts.AppShortcutLauncherActivity"
             android:launchMode="singleInstance"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <service
-            android:name="com.poupa.vinylmusicplayer.service.MusicService"
+            android:name="io.github.omblivion.needle.service.MusicService"
             android:enabled="true"
             android:label="@string/app_name"
             android:exported="true">
@@ -157,7 +157,7 @@
         </service>
 
 
-        <receiver android:name="com.poupa.vinylmusicplayer.service.MediaButtonIntentReceiver"
+        <receiver android:name="io.github.omblivion.needle.service.MediaButtonIntentReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
@@ -172,7 +172,7 @@
             android:value="true" />
 
         <!-- Widgets -->
-        <receiver android:name="com.poupa.vinylmusicplayer.appwidgets.BootReceiver"
+        <receiver android:name="io.github.omblivion.needle.appwidgets.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -180,7 +180,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name="com.poupa.vinylmusicplayer.appwidgets.AppWidgetBig"
+            android:name="io.github.omblivion.needle.appwidgets.AppWidgetBig"
             android:exported="false"
             android:label="@string/app_widget_big_name">
             <intent-filter>
@@ -192,7 +192,7 @@
                 android:resource="@xml/app_widget_big_info" />
         </receiver>
         <receiver
-            android:name="com.poupa.vinylmusicplayer.appwidgets.AppWidgetClassic"
+            android:name="io.github.omblivion.needle.appwidgets.AppWidgetClassic"
             android:exported="false"
             android:label="@string/app_widget_classic_name">
             <intent-filter>
@@ -204,7 +204,7 @@
                 android:resource="@xml/app_widget_classic_info" />
         </receiver>
         <receiver
-            android:name="com.poupa.vinylmusicplayer.appwidgets.AppWidgetSmall"
+            android:name="io.github.omblivion.needle.appwidgets.AppWidgetSmall"
             android:exported="false"
             android:label="@string/app_widget_small_name">
             <intent-filter>
@@ -216,7 +216,7 @@
                 android:resource="@xml/app_widget_small_info" />
         </receiver>
         <receiver
-            android:name="com.poupa.vinylmusicplayer.appwidgets.AppWidgetCard"
+            android:name="io.github.omblivion.needle.appwidgets.AppWidgetCard"
             android:exported="false"
             android:label="@string/app_widget_card_name">
             <intent-filter>

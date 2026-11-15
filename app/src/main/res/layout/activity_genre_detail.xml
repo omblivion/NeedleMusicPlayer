@@ -7,7 +7,7 @@
     tools:ignore="UnusedAttribute">
 
     <!-- for getSwipeableContainerView() -->
-    <com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout
+    <io.github.omblivion.needle.views.TouchInterceptFrameLayout
         android:id="@+id/touch_intercept_framelayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -31,18 +31,18 @@
                     style="@style/Toolbar"
                     android:background="@android:color/transparent">
 
-                    <com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView
+                    <io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView
                         android:id="@+id/title_scrollview"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content">
 
-                        <com.poupa.vinylmusicplayer.views.AutoTruncateTextView
+                        <io.github.omblivion.needle.views.AutoTruncateTextView
                             android:id="@+id/title"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             style="@style/TextAppearance.AppCompat.Widget.ActionBar.Title" />
 
-                    </com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView>
+                    </io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView>
 
                 </androidx.appcompat.widget.Toolbar>
             </FrameLayout>
@@ -67,6 +67,6 @@
             android:textSize="@dimen/empty_text_size"
             android:visibility="gone" />
 
-    </com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout>
+    </io.github.omblivion.needle.views.TouchInterceptFrameLayout>
 
 </FrameLayout>

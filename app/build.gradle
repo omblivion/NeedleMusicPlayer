@@ -34,7 +34,7 @@ licenses {
 
 android {
     compileSdk 34
-    namespace 'com.poupa.vinylmusicplayer'
+    namespace 'io.github.omblivion.needle'
     defaultConfig {
         minSdkVersion 19
         targetSdkVersion 33
@@ -42,7 +42,7 @@ android {
 
         vectorDrawables.useSupportLibrary = true
 
-        applicationId 'com.poupa.vinylmusicplayer'
+        applicationId 'io.github.omblivion.needle'
         versionCode 202
         versionName '1.11.0'
 
@@ -61,21 +61,22 @@ android {
     }
     signingConfigs {
         ci {
-            final String keystorePropertiesFile = rootProject.file('keystore.properties')
-            final Properties keystoreProperties = new Properties()
-            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
+            final File keystorePropertiesFile = rootProject.file('keystore.properties')
+            if (keystorePropertiesFile.exists()) {
+                final Properties keystoreProperties = new Properties()
+                keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
     flavorDimensions = ['default']
     productFlavors {
         playStore {
             dimension 'default'
-            signingConfig signingConfigs.ci
+            if (signingConfigs.ci.storeFile != null) signingConfig signingConfigs.ci
         }
         fdroid {
             dimension 'default'
@@ -83,15 +84,15 @@ android {
         ci {
             dimension 'default'
 
-            final String gitBranch = providers.exec {commandLine('git', 'rev-parse', '--abbrev-ref', 'HEAD')}.standardOutput.asText.get().trim()
+            final String gitBranch = providers.exec {commandLine('git', 'rev-parse', '--abbrev-ref', 'HEAD')}.standardOutput.asText.get().trim().replaceAll('[^A-Za-z0-9._-]', '_')
             final String gitSha1 = providers.exec {commandLine('git', 'rev-parse', '--short', 'HEAD')}.standardOutput.asText.get().trim()
             final String buildTime = new Date().format('yyMMdd-HHmm')
             final String buildId = gitBranch + '_' + gitSha1 + '_' + buildTime
 
             applicationIdSuffix '.ci'
             versionNameSuffix '-' + buildId + ' CI'
-            signingConfig signingConfigs.ci
-            archivesBaseName = 'vinyl_' + buildId
+            if (signingConfigs.ci.storeFile != null) signingConfig signingConfigs.ci
+            archivesBaseName = 'needle_' + buildId
         }
     }
     packagingOptions {

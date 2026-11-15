@@ -27,7 +27,7 @@ device info.
  - Device: 
  - Android Version:
  - ROM:
- - Vinyl Music Player Version:
+ - Needle Music Player Version:
 
 **Additional context**
 Add any other context about the problem here.

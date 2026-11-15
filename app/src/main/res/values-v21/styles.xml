@@ -1,23 +1,23 @@
 <resources>
 
-    <style name="Theme.VinylMusicPlayer" parent="Theme.VinylMusicPlayer.Base">
+    <style name="Theme.NeedleMusicPlayer" parent="Theme.NeedleMusicPlayer.Base">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowSharedElementsUseOverlay">false</item>
     </style>
 
-    <style name="Theme.VinylMusicPlayer.Light" parent="Theme.VinylMusicPlayer.Base.Light">
+    <style name="Theme.NeedleMusicPlayer.Light" parent="Theme.NeedleMusicPlayer.Base.Light">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowSharedElementsUseOverlay">false</item>
     </style>
 
-    <style name="Theme.VinylMusicPlayer.Black" parent="Theme.VinylMusicPlayer.Base.Black">
+    <style name="Theme.NeedleMusicPlayer.Black" parent="Theme.NeedleMusicPlayer.Base.Black">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowSharedElementsUseOverlay">false</item>
     </style>
 
-    <style name="Theme.VinylMusicPlayer.Notification" parent="@android:style/TextAppearance.Material.Notification" />
+    <style name="Theme.NeedleMusicPlayer.Notification" parent="@android:style/TextAppearance.Material.Notification" />
 
-    <style name="Theme.VinylMusicPlayer.Notification.Title" parent="@android:style/TextAppearance.Material.Notification.Title" />
+    <style name="Theme.NeedleMusicPlayer.Notification.Title" parent="@android:style/TextAppearance.Material.Notification.Title" />
 
     <style name="Fab" parent="FabParent">
         <item name="android:transitionName">@string/transition_fab</item>

@@ -190,7 +190,7 @@
     <string name="report_bugs">Rapporteer bugs</string>
     <string name="report_bugs_summary">Rapporteer bugs of verzoek nieuwe functies.</string>
     <string name="rate_on_google_play">Beoordelen</string>
-    <string name="rate_on_google_play_summary">Laat een positieve beoordeling achter op Google Play als je Vinyl Music Player leuk vindt.</string>
+    <string name="rate_on_google_play_summary">Laat een positieve beoordeling achter op Google Play als je Needle Music Player leuk vindt.</string>
     <string name="aidan_follestad_summary">Voor de themamogelijkheden en andere goede functies.</string>
     <string name="michael_cook_summary">Voor het mooie material app icoon.</string>
     <string name="maarten_corpel_summary">Voor het maken van de Play Store illustratie en de lege album hoes.</string>
@@ -199,7 +199,7 @@
     <string name="up_next">Als volgende</string>
     <string name="pref_title_now_playing_screen_appearance">Uiterlijk</string>
     <string name="intro_label">Introductie</string>
-    <string name="welcome_to_vinyl_music_player">"Welkom bij Vinyl Music Player, een mooie en lichte muziekspeler voor Android."</string>
+    <string name="welcome_to_needle_music_player">"Welkom bij Needle Music Player, een mooie en lichte muziekspeler voor Android."</string>
     <string name="open_playing_queue_instruction">Veeg de kaart in het afspeelscherm om de afspeelwachtrij te weergeven.</string>
     <string name="rearrange_playing_queue_instruction">Rangschik de afspeelwachtrij door de afspeelnummers te verslepen.</string>
     <string name="library">Bibliotheek</string>
@@ -212,10 +212,10 @@
     <string name="could_not_scan_files">Kan %d bestanden niet scannen.</string>
     <string name="listing_files">Bestandslijst maken</string>
     <string name="new_start_directory">%s is de nieuwe startmap</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Groot</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Klassiek</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Klein</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Kaart</string>
+    <string name="app_widget_big_name">Needle Music Player - Groot</string>
+    <string name="app_widget_classic_name">Needle Music Player - Klassiek</string>
+    <string name="app_widget_small_name">Needle Music Player - Klein</string>
+    <string name="app_widget_card_name">Needle Music Player - Kaart</string>
     <string name="report_an_issue">Rapporteer een probleem</string>
     <string name="bug_report_issue">Probleem</string>
     <string name="login">Login</string>
@@ -303,13 +303,13 @@
     <string name="imported_x_playlists">Geïmporteerde %d afspeellijsten</string>
     <string name="imported_x_skipped_x_playlists">%1$d afspeellijsten geïmporteerd, %2$d overgeslagen</string>
     <string name="some_files_are_not_listed_in_the_media_store">Sommige bestanden worden niet weergegeven in de mediaopslag.</string>
-    <string name="app_crashed">Vinyl Muziek Speler is gecrasht</string>
+    <string name="app_crashed">Needle Music Player is gecrasht</string>
     <string name="report_a_crash_invitation">Sorry voor het ongemak.\n\n
     Gegevens over de crash zijn verzameld en kunnen de ontwikkelaars helpen om deze situatie te verbeteren.\n
     Je wordt aangemoedigd de verzamelde gegevens te bekijken en zelf beslissen welke gegevens je indient.</string>
     <string name="report_a_crash">Een crash melden</string>
     <string name="idle_notification_description">De inactieve melding wordt gebruikt als de afspeelwachtrij leeg is</string>
-    <string name="idle_notification_title">Vinyl wordt uitgevoerd</string>
+    <string name="idle_notification_title">Needle wordt uitgevoerd</string>
     <string name="you_have_to_select_at_least_one_category">Je moet minstens één categorie selecteren.</string>
     <string name="action_sort_order">Sorteer volgorde</string>
     <string name="sort_order_name">Naam</string>
@@ -325,7 +325,7 @@
     <string name="sort_order_group_by_album">Groepeer op album</string>
     <string name="finish_current_music_sleep_timer">Laatste nummer afmaken</string>
     <string name="dialog_ringtone_title">Ringstone instellen</string>
-    <string name="dialog_ringtone_message">Laat Vinyl Music Player de systeeminstellingen in het volgende scherm aanpassen voordat je de ringtone instelt.</string>
+    <string name="dialog_ringtone_message">Laat Needle Music Player de systeeminstellingen in het volgende scherm aanpassen voordat je de ringtone instelt.</string>
     <string name="action_scan_directory">Directory scannen</string>
     <string name="reset_discography">Bibliotheek opnieuw scannen</string>
     <string name="reset_discography_warning">Dit zal de interne database met nummers van de app wissen en opnieuw opbouwen.\n\nEr wordt geen nummer gewist tijdens deze handeling, maar de afspeelgeschiedenis wordt mogelijk gewist.\n\nGedurende een mogelijk lange periode, totdat de rescan is voltooid, kun je de app niet normaal gebruiken.</string>

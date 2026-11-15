@@ -5,6 +5,7 @@
 
 # to use: run this shell script from root of android project (before hand, `jq` and `gh` need to be installed in our system - be careful, gh need to be run once before to configure it properly)
 
+# Preserve upstream credits; these are not the current fork's maintainer list.
 org=VinylMusicPlayer
 repo=${org}/VinylMusicPlayer
 maintainers_csv="app/src/main/assets/maintainers.csv"

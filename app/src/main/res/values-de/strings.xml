@@ -254,7 +254,7 @@
     <string name="report_bugs">Fehler melden</string>
     <string name="report_bugs_summary">Melde Fehler oder schlage neue Features vor.</string>
     <string name="rate_on_google_play">Bewerten</string>
-    <string name="rate_on_google_play_summary">Hinterlasse eine positive Bewertung auf Google Play, falls dir Vinyl Music Player gefällt.</string>
+    <string name="rate_on_google_play_summary">Hinterlasse eine positive Bewertung auf Google Play, falls dir Needle Music Player gefällt.</string>
     <string name="aidan_follestad_summary">Für die Theme Engine und andere tolle Sachen.</string>
     <string name="karim_abou_zeid_summary">Ursprünglicher Autor.</string>
     <string name="michael_cook_summary">Für das schöne Material App Icon.</string>
@@ -266,7 +266,7 @@
     <string name="up_next">Als Nächstes</string>
     <string name="pref_title_now_playing_screen_appearance">Aussehen</string>
     <string name="intro_label">Einführung</string>
-    <string name="welcome_to_vinyl_music_player">"Willkommen bei Vinyl Music Player, ein einfacher und schöner Musik Player für Android. "</string>
+    <string name="welcome_to_needle_music_player">"Willkommen bei Needle Music Player, ein einfacher und schöner Musik Player für Android. "</string>
     <string name="open_playing_queue_instruction">Ziehe die Karte in der aktuellen Wiedergabe hoch, um die komplette Warteschlange anzeigen zu lassen.</string>
     <string name="rearrange_playing_queue_instruction">Ziehe die Titelnummer eines Titels nach oben oder unten, um die Warteschlange neu anzuordnen.</string>
     <string name="library">Bibliothek</string>
@@ -288,12 +288,12 @@
     <string name="scanning_x_songs_removed">%1$d Titel entfernt</string>
     <string name="listing_files">Dateien werden gelistet</string>
     <string name="new_start_directory">%s ist das neue Start-Verzeichnis.</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Groß</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Klassisch</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Klein</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Karte</string>
+    <string name="app_widget_big_name">Needle Music Player - Groß</string>
+    <string name="app_widget_classic_name">Needle Music Player - Klassisch</string>
+    <string name="app_widget_small_name">Needle Music Player - Klein</string>
+    <string name="app_widget_card_name">Needle Music Player - Karte</string>
 
-    <string name="app_crashed">Vinyl Music Player ist abgestürzt</string>
+    <string name="app_crashed">Needle Music Player ist abgestürzt</string>
 
     <string name="report_a_crash_invitation">Entschuldigung, das hätte nicht passieren dürfen.\n\nAbsturzrelevante Daten
         wurden gesammelt und können den Entwicklern bei Verbesserungen helfen.\nDu kannst einen Fehlerbericht
@@ -338,7 +338,7 @@
 
     <string name="idle_notification_description">Die Leerlaufbenachrichtigung wird angezeigt, wenn die Warteschlange leer ist</string>
     <string name="idle_notification_name">Leerlaufbenachrichtigung</string>
-    <string name="idle_notification_title">Vinyl läuft</string>
+    <string name="idle_notification_title">Needle läuft</string>
 
     <string name="add_action">Hinzufügen</string>
     <string name="blacklist">Blacklist</string>
@@ -366,7 +366,7 @@
     <string name="sort_order_group_by_album">Nach Album gruppieren</string>
     <string name="finish_current_music_sleep_timer">Letzten Titel zu Ende spielen</string>
     <string name="dialog_ringtone_title">Klingelton festlegen</string>
-    <string name="dialog_ringtone_message">Bitte erlaube Vinyl Music Player im nächsten Dialog, die Systemeinstellungen zu verändern, bevor du den Klingelton festlegst.</string>
+    <string name="dialog_ringtone_message">Bitte erlaube Needle Music Player im nächsten Dialog, die Systemeinstellungen zu verändern, bevor du den Klingelton festlegst.</string>
     <string name="action_scan_directory">Ordner scannen</string>
     <string name="reset_discography">Bibliothek neu einlesen</string>
     <string name="reset_discography_warning">Dies wird die interne Titeldatenbank der App löschen und neu erstellen.\n\nKein Titel wird durch diese Aktion gelöscht, aber der Wiedergabeverlauf könnte gelöscht werden.\n\nIm Falle eines längeren Scanvorgangs wird die App nicht wie sonst nutzbar sein</string>

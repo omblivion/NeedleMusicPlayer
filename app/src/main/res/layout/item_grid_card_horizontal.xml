@@ -11,7 +11,7 @@
     app:cardBackgroundColor="?cardBackgroundColor">
 
     <!-- for getSwipeableContainerView() -->
-    <com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout
+    <io.github.omblivion.needle.views.TouchInterceptFrameLayout
         android:id="@+id/touch_intercept_framelayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -21,7 +21,7 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <com.poupa.vinylmusicplayer.views.WidthFitSquareLayout
+            <io.github.omblivion.needle.views.WidthFitSquareLayout
                 android:id="@+id/image_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
@@ -33,7 +33,7 @@
                     android:scaleType="centerCrop"
                     tools:ignore="ContentDescription" />
 
-            </com.poupa.vinylmusicplayer.views.WidthFitSquareLayout>
+            </io.github.omblivion.needle.views.WidthFitSquareLayout>
 
             <LinearLayout
                 android:id="@+id/palette_color_container"
@@ -44,12 +44,12 @@
                 android:paddingLeft="16dp"
                 android:paddingRight="16dp">
 
-                <com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView
+                <io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView
                     android:id="@+id/title_scrollview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <com.poupa.vinylmusicplayer.views.AutoTruncateTextView
+                    <io.github.omblivion.needle.views.AutoTruncateTextView
                         android:id="@+id/title"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -58,14 +58,14 @@
                         android:textAppearance="@style/TextAppearance.AppCompat.Subhead"
                         android:textSize="14sp" />
 
-                </com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView>
+                </io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView>
 
-                <com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView
+                <io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView
                     android:id="@+id/text_scrollview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <com.poupa.vinylmusicplayer.views.AutoTruncateTextView
+                    <io.github.omblivion.needle.views.AutoTruncateTextView
                         android:id="@+id/text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -73,13 +73,13 @@
                         android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                         android:textSize="12sp" />
 
-                </com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView>
+                </io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView>
 
             </LinearLayout>
 
         </LinearLayout>
 
-    </com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout>
+    </io.github.omblivion.needle.views.TouchInterceptFrameLayout>
 
 </com.google.android.material.card.MaterialCardView>
 

@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <com.poupa.vinylmusicplayer.views.WidthFitSquareLayout
+                <io.github.omblivion.needle.views.WidthFitSquareLayout
                     android:id="@+id/album_cover_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -42,15 +42,15 @@
 
                     <fragment
                         android:id="@+id/player_album_cover_fragment"
-                        class="com.poupa.vinylmusicplayer.ui.fragments.player.PlayerAlbumCoverFragment"
+                        class="io.github.omblivion.needle.ui.fragments.player.PlayerAlbumCoverFragment"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                </com.poupa.vinylmusicplayer.views.WidthFitSquareLayout>
+                </io.github.omblivion.needle.views.WidthFitSquareLayout>
 
                 <fragment
                     android:id="@+id/playback_controls_fragment"
-                    class="com.poupa.vinylmusicplayer.ui.fragments.player.card.CardPlayerPlaybackControlsFragment"
+                    class="io.github.omblivion.needle.ui.fragments.player.card.CardPlayerPlaybackControlsFragment"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_below="@id/album_cover_container" />
@@ -69,7 +69,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <com.poupa.vinylmusicplayer.views.StatusBarView
+                    <io.github.omblivion.needle.views.StatusBarView
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/status_bar_padding" />
 
@@ -85,7 +85,7 @@
 
         </FrameLayout>
 
-        <com.poupa.vinylmusicplayer.views.StatusBarMarginFrameLayout
+        <io.github.omblivion.needle.views.StatusBarMarginFrameLayout
             android:id="@+id/player_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -151,7 +151,7 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-        </com.poupa.vinylmusicplayer.views.StatusBarMarginFrameLayout>
+        </io.github.omblivion.needle.views.StatusBarMarginFrameLayout>
 
     </com.sothree.slidinguppanel.SlidingUpPanelLayout>
 

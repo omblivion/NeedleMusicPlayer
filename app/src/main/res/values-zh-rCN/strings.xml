@@ -189,7 +189,7 @@
     <string name="report_bugs">提交 bug</string>
     <string name="report_bugs_summary">提交 bug 或申请添加新功能</string>
     <string name="rate_on_google_play">评分</string>
-    <string name="rate_on_google_play_summary">如果喜欢 Vinyl Music Player 请在 Play Store 中留下您的好评。</string>
+    <string name="rate_on_google_play_summary">如果喜欢 Needle Music Player 请在 Play Store 中留下您的好评。</string>
     <string name="aidan_follestad_summary">主题引擎以及其他一些优秀功能。</string>
     <string name="michael_cook_summary">精致的质感设计图标。</string>
     <string name="maarten_corpel_summary">Play Store 标题图以及空专辑封面的设计方案。</string>
@@ -198,7 +198,7 @@
     <string name="up_next">即将播放</string>
     <string name="pref_title_now_playing_screen_appearance">外观</string>
     <string name="intro_label">介绍页</string>
-    <string name="welcome_to_vinyl_music_player">"欢迎使用 Vinyl Music Player，这是一款精致且简洁的 Android 音乐播放器。 "</string>
+    <string name="welcome_to_needle_music_player">"欢迎使用 Needle Music Player，这是一款精致且简洁的 Android 音乐播放器。 "</string>
     <string name="open_playing_queue_instruction">上滑正在播放界面内的卡片即可展开播放队列。</string>
     <string name="rearrange_playing_queue_instruction">通过拖动歌曲名前面的序列号来调整播放队列的顺序。</string>
     <string name="library">媒体库</string>
@@ -211,10 +211,10 @@
     <string name="could_not_scan_files">%d 个文件无法扫描。</string>
     <string name="listing_files">正在列举文件</string>
     <string name="new_start_directory">%s 是新的初始目录。</string>
-    <string name="app_widget_big_name">Vinyl Music Player - 大尺寸</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - 经典</string>
-    <string name="app_widget_small_name">Vinyl Music Player - 小尺寸</string>
-    <string name="app_widget_card_name">Vinyl Music Player - 卡片</string>
+    <string name="app_widget_big_name">Needle Music Player - 大尺寸</string>
+    <string name="app_widget_classic_name">Needle Music Player - 经典</string>
+    <string name="app_widget_small_name">Needle Music Player - 小尺寸</string>
+    <string name="app_widget_card_name">Needle Music Player - 卡片</string>
     <string name="report_an_issue">报告问题</string>
     <string name="bug_report_issue">问题</string>
     <string name="login">登录</string>
@@ -310,7 +310,7 @@
     <string name="adrian_summary">设计了专辑页面。</string>
     <string name="sort_order_date_added_reverse">添加日期</string>
     <string name="dialog_ringtone_title">设置为铃声</string>
-    <string name="dialog_ringtone_message">在设置铃声前请允许Vinyl音乐播放器在下一屏修改系统设置。</string>
+    <string name="dialog_ringtone_message">在设置铃声前请允许Needle音乐播放器在下一屏修改系统设置。</string>
     <string name="reset_discography">重新扫描媒体库</string>
     <string name="none">无</string>
     <string name="track">音轨</string>

@@ -1,14 +1,14 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.VinylMusicPlayer" parent="Theme.VinylMusicPlayer.Base" />
+    <style name="Theme.NeedleMusicPlayer" parent="Theme.NeedleMusicPlayer.Base" />
 
-    <style name="Theme.VinylMusicPlayer.Light" parent="Theme.VinylMusicPlayer.Base.Light" />
+    <style name="Theme.NeedleMusicPlayer.Light" parent="Theme.NeedleMusicPlayer.Base.Light" />
 
-    <style name="Theme.VinylMusicPlayer.Black" parent="Theme.VinylMusicPlayer.Base.Black" />
+    <style name="Theme.NeedleMusicPlayer.Black" parent="Theme.NeedleMusicPlayer.Base.Black" />
 
-    <style name="Theme.VinylMusicPlayer.Notification" parent="@android:style/TextAppearance.StatusBar.EventContent" />
+    <style name="Theme.NeedleMusicPlayer.Notification" parent="@android:style/TextAppearance.StatusBar.EventContent" />
 
-    <style name="Theme.VinylMusicPlayer.Notification.Title" parent="@android:style/TextAppearance.StatusBar.EventContent.Title" />
+    <style name="Theme.NeedleMusicPlayer.Notification.Title" parent="@android:style/TextAppearance.StatusBar.EventContent.Title" />
 
     <style name="Snackbar" parent="@style/Widget.MaterialComponents.Snackbar">
         <!-- Override Material style -->

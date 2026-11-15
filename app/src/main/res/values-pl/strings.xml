@@ -190,7 +190,7 @@
     <string name="report_bugs">Zgłoś błędy</string>
     <string name="report_bugs_summary">Zgłaszaj błędy lub propozycje nowych funkcji</string>
     <string name="rate_on_google_play">Oceń</string>
-    <string name="rate_on_google_play_summary">Jeśli polubiłeś/aś Vinyl Music Player, oceń go pozytywnie w sklepie Google Play</string>
+    <string name="rate_on_google_play_summary">Jeśli polubiłeś/aś Needle Music Player, oceń go pozytywnie w sklepie Google Play</string>
     <string name="aidan_follestad_summary">Za mechanizm motywów i kilka innych, świetnych rzeczy</string>
     <string name="michael_cook_summary">Za piękną ikonę aplikacji</string>
     <string name="maarten_corpel_summary">Za zilustrowanie aplikacji w sklepie Google Play</string>
@@ -199,7 +199,7 @@
     <string name="up_next">Za chwilę zagra</string>
     <string name="pref_title_now_playing_screen_appearance">Wygląd</string>
     <string name="intro_label">Wprowadzenie</string>
-    <string name="welcome_to_vinyl_music_player">"Witaj w Vinyl Music Player, pięknym i lekkim odtwarzaczu muzyki na Androida "</string>
+    <string name="welcome_to_needle_music_player">"Witaj w Needle Music Player, pięknym i lekkim odtwarzaczu muzyki na Androida "</string>
     <string name="open_playing_queue_instruction">Przesuń kartę na ekranie Obecnie Grane w górę, aby odsłonić pełną kolejkę odtwarzania</string>
     <string name="rearrange_playing_queue_instruction">Zmień kolejność odtwarzania, przeciągając numer utworu w górę lub w dół kolejki</string>
     <string name="library">Biblioteka</string>
@@ -212,10 +212,10 @@
     <string name="could_not_scan_files">Nie można przeskanować %d plików</string>
     <string name="listing_files">Lista plików</string>
     <string name="new_start_directory">%s jest nowym folderem startowym</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Duży</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Klasyczny</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Mały</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Karta</string>
+    <string name="app_widget_big_name">Needle Music Player - Duży</string>
+    <string name="app_widget_classic_name">Needle Music Player - Klasyczny</string>
+    <string name="app_widget_small_name">Needle Music Player - Mały</string>
+    <string name="app_widget_card_name">Needle Music Player - Karta</string>
     <string name="report_an_issue">Zgłoś problem</string>
     <string name="bug_report_issue">Problem</string>
     <string name="login">Zaloguj się</string>

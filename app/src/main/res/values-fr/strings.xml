@@ -2,7 +2,7 @@
 <resources>
     <!-- App introduction -->
     <string name="intro_label">Introduction</string>
-    <string name="welcome_to_vinyl_music_player">"Bienvenue sur Vinyl Music Player, un lecteur de musique beau et léger pour Android."</string>
+    <string name="welcome_to_needle_music_player">"Bienvenue sur Needle Music Player, un lecteur de musique beau et léger pour Android."</string>
     <string name="open_playing_queue_instruction">Vous pouvez glisser la carte dans l\'écran de lecture en cours pour afficher la file de lecture complète.</string>
     <string name="rearrange_playing_queue_instruction">Vous pouvez réorganiser la file de lecture en faisant glisser une chanson à partir de son numéro de piste.</string>
     <!-- Menu -->
@@ -250,7 +250,7 @@
     <string name="playing_notification_name">Notification de lecture</string>
     <string name="idle_notification_description">La notification d\'inactivité est utilisé quand la file de lecture est vide</string>
     <string name="idle_notification_name">Notification d\'inactivité</string>
-    <string name="idle_notification_title">Vinyl est en cours d\'éxecution</string>
+    <string name="idle_notification_title">Needle est en cours d\'éxecution</string>
     <!-- Storage scan -->
     <string name="some_files_are_not_listed_in_the_media_store">Certains fichiers ne sont pas listés dans le catalogue de médias</string>
     <string name="nothing_to_scan">Rien à analyser</string>
@@ -280,7 +280,7 @@
     <string name="error_no_app_for_intent">Aucune application disponible pour ouvrir cette page.</string>
     <string name="what_do_you_want_to_share">Que voulez-vous partager ?</string>
     <string name="currently_listening_to_x_by_x">Vous écoutez %1$s de %2$s</string>
-    <string name="dialog_ringtone_message">Autoriser Vinyl Music Player à modifier les paramètres audio</string>
+    <string name="dialog_ringtone_message">Autoriser Needle Music Player à modifier les paramètres audio</string>
     <!-- Unknown? -->
     <string name="delete_action">Supprimer</string>
     <string name="clear_action">Effacer</string>
@@ -311,7 +311,7 @@
     <string name="report_bugs">Signaler des bugs</string>
     <string name="report_bugs_summary">Signaler des bugs ou demander de nouvelles fonctionnalités</string>
     <string name="rate_on_google_play">Évaluer</string>
-    <string name="rate_on_google_play_summary">Laissez une note positive sur le Play Store si vous aimez Vinyl Music Player</string>
+    <string name="rate_on_google_play_summary">Laissez une note positive sur le Play Store si vous aimez Needle Music Player</string>
     <string name="aidan_follestad_summary">Pour le moteur de thème et quelques autres trucs formidables.</string>
     <string name="karim_abou_zeid_summary">Auteur original.</string>
     <string name="michael_cook_summary">Pour la jolie icône de l\'application material design.</string>
@@ -322,10 +322,10 @@
     <string name="website">Site Internet</string>
     <string name="up_next">Prochainement</string>
     <!-- Widget -->
-    <string name="app_widget_big_name">Vinyl Music Player - Grand</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Classique</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Petit</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Carte</string>
+    <string name="app_widget_big_name">Needle Music Player - Grand</string>
+    <string name="app_widget_classic_name">Needle Music Player - Classique</string>
+    <string name="app_widget_small_name">Needle Music Player - Petit</string>
+    <string name="app_widget_card_name">Needle Music Player - Carte</string>
     <!-- Bug reporting -->
     <string name="report_an_issue">Signaler un problème</string>
     <string name="bug_report_issue">Problème</string>

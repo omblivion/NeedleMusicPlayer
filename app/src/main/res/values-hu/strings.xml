@@ -189,7 +189,7 @@
     <string name="report_bugs">Hibajelentés</string>
     <string name="report_bugs_summary">Problémák jelentése, új funkciók kérése.</string>
     <string name="rate_on_google_play">Értékelés</string>
-    <string name="rate_on_google_play_summary">Értékelje a Google Play-en a Vinyl Music Player-ot, ha tetszik önnek!</string>
+    <string name="rate_on_google_play_summary">Értékelje a Google Play-en a Needle Music Player-ot, ha tetszik önnek!</string>
     <string name="aidan_follestad_summary">A téma motorért, és egyéb remek dolgok miatt.</string>
     <string name="michael_cook_summary">Az alkalmazás ikonjáért.</string>
     <string name="maarten_corpel_summary">A Play Áruházas illusztrációért és az üres albumborítóért.</string>
@@ -198,7 +198,7 @@
     <string name="up_next">Lejátszási sor</string>
     <string name="pref_title_now_playing_screen_appearance">Megjelenés</string>
     <string name="intro_label">Bevezető</string>
-    <string name="welcome_to_vinyl_music_player">"Üdvözlöm! A Vinyl Music Player egy szép és kis méretű zenelejátszó Androidra. "</string>
+    <string name="welcome_to_needle_music_player">"Üdvözlöm! A Needle Music Player egy szép és kis méretű zenelejátszó Androidra. "</string>
     <string name="open_playing_queue_instruction">Húzza fel a kártyát a most játszott képernyőn, hogy megnyissa a lejátszási sort.</string>
     <string name="rearrange_playing_queue_instruction">A lejátszási sort átrendezheti, ha a dalokat a sorszámuknál megfogva húzni kezdi.</string>
     <string name="library">Könyvtár</string>
@@ -211,10 +211,10 @@
     <string name="could_not_scan_files">%d fájl beolvasása nem sikerült.</string>
     <string name="listing_files">Fájlok betöltése</string>
     <string name="new_start_directory">Az új kezdő könyvtár: %s</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Nagy</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Klasszikus</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Kicsi</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Kártya</string>
+    <string name="app_widget_big_name">Needle Music Player - Nagy</string>
+    <string name="app_widget_classic_name">Needle Music Player - Klasszikus</string>
+    <string name="app_widget_small_name">Needle Music Player - Kicsi</string>
+    <string name="app_widget_card_name">Needle Music Player - Kártya</string>
     <string name="report_an_issue">Hibajelentés</string>
     <string name="bug_report_issue">A hiba részletei</string>
     <string name="login">Bejelentkezés</string>

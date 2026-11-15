@@ -50,7 +50,7 @@
             android:paddingRight="16dp"
             android:focusable="true">
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/icon_info"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
@@ -95,7 +95,7 @@
             android:paddingLeft="16dp"
             android:paddingRight="16dp">
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/icon_changelog"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
@@ -126,7 +126,7 @@
             android:paddingLeft="@dimen/default_item_margin"
             android:paddingRight="@dimen/default_item_margin">
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/icon_intro"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
@@ -157,7 +157,7 @@
             android:paddingLeft="@dimen/default_item_margin"
             android:paddingRight="@dimen/default_item_margin">
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/icon_github"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
@@ -188,7 +188,7 @@
             android:paddingLeft="@dimen/default_item_margin"
             android:paddingRight="@dimen/default_item_margin">
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/icon_licenses"
                 android:layout_width="24dp"
                 android:layout_height="24dp"

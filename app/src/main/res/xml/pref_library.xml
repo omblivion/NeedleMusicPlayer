@@ -3,7 +3,7 @@
 
     <com.kabouzeid.appthemehelper.common.prefs.supportv7.ATEPreferenceCategory android:title="@string/pref_header_library">
 
-        <com.poupa.vinylmusicplayer.preferences.LibraryPreference
+        <io.github.omblivion.needle.preferences.LibraryPreference
             app:iconSpaceReserved="false"
             android:key="library_categories"
             android:summary="@string/pref_summary_library_categories"
@@ -16,7 +16,7 @@
             android:summary="@string/pref_summary_remember_last_tab"
             android:title="@string/pref_title_remember_last_tab" />
 
-        <com.poupa.vinylmusicplayer.preferences.BlacklistPreference
+        <io.github.omblivion.needle.preferences.BlacklistPreference
             app:iconSpaceReserved="false"
             android:key="blacklist"
             android:summary="@string/pref_summary_blacklist"

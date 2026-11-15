@@ -172,7 +172,7 @@
     <string name="report_bugs">Αναφορά σφαλμάτων</string>
     <string name="report_bugs_summary">Αναφέρετε σφάλματα ή ζητείστε νέα χαρακτηριστικά.</string>
     <string name="rate_on_google_play">Βαθμολογήστε</string>
-    <string name="rate_on_google_play_summary">Αφήστε μια θετική αξιολόγηση  στο Google Play, αν σας αρέσει το Vinyl Music Player.</string>
+    <string name="rate_on_google_play_summary">Αφήστε μια θετική αξιολόγηση  στο Google Play, αν σας αρέσει το Needle Music Player.</string>
     <string name="aidan_follestad_summary">Για την μηχανή θεμάτων και κάποια άλλα ωραία πράγματα.</string>
     <string name="michael_cook_summary">Για το όμορφο material εικονίδιο της εφαρμογής.</string>
     <string name="maarten_corpel_summary">Για την δημιουργία της εικονογράφησης του Play Store και του άδειου εξώφυλλου του άλμπουμ.</string>
@@ -181,7 +181,7 @@
     <string name="up_next">Επόμενο</string>
     <string name="pref_title_now_playing_screen_appearance">Εμφάνιση</string>
     <string name="intro_label">Εισαγωγή</string>
-    <string name="welcome_to_vinyl_music_player">"Καλώς ήρθατε στο Vinyl Music Player, ένα όμορφο και ελαφρύ πρόγραμμα αναπαραγωγής μουσικής για το Android.  "</string>
+    <string name="welcome_to_needle_music_player">"Καλώς ήρθατε στο Needle Music Player, ένα όμορφο και ελαφρύ πρόγραμμα αναπαραγωγής μουσικής για το Android.  "</string>
     <string name="open_playing_queue_instruction">Σύρετε την κάρτα στην οθόνη \"παίζει τώρα\" μέχρι να αποκαλυφθεί ολόκληρη η σειρά τραγουδιών.</string>
     <string name="rearrange_playing_queue_instruction">Κάντε αναδιάταξη της σειράς τραγουδιών  σύροντας ένα τραγούδι από τον αριθμό του.</string>
     <string name="library">Βιβλιοθήκη</string>
@@ -194,9 +194,9 @@
     <string name="could_not_scan_files">Δεν μπόρεσε να πραγματοποιηθεί σάρωση σε %d αρχεία.</string>
     <string name="listing_files">Λίστα αρχείων</string>
     <string name="new_start_directory">%s είναι ο νέος κατάλογος έναρξης.</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Μεγάλο</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Κλασικό</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Μικρό</string>
+    <string name="app_widget_big_name">Needle Music Player - Μεγάλο</string>
+    <string name="app_widget_classic_name">Needle Music Player - Κλασικό</string>
+    <string name="app_widget_small_name">Needle Music Player - Μικρό</string>
     <string name="report_an_issue">Αναφέρετε ένα πρόβλημα</string>
     <string name="bug_report_issue">Πρόβλημα</string>
     <string name="login">Είσοδος</string>

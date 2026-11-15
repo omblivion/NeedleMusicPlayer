@@ -201,7 +201,7 @@
     <string name="report_bugs">Ohlásit chybu</string>
     <string name="report_bugs_summary">"Nahlásit chyby nebo požádat o nové funkce. "</string>
     <string name="rate_on_google_play">Ohodnotit</string>
-    <string name="rate_on_google_play_summary">Pokud máte Vinyl Music Player rádi, zanechte pozitivní hodnocení na Google Play.</string>
+    <string name="rate_on_google_play_summary">Pokud máte Needle Music Player rádi, zanechte pozitivní hodnocení na Google Play.</string>
     <string name="aidan_follestad_summary">Za motivy a jiné další super věci.</string>
     <string name="karim_abou_zeid_summary">Původní autor.</string>
     <string name="michael_cook_summary">Za pěknou Material ikonu aplikace.</string>
@@ -211,7 +211,7 @@
     <string name="up_next">"Další "</string>
     <string name="pref_title_now_playing_screen_appearance">Vzhled</string>
     <string name="intro_label">"Úvod "</string>
-    <string name="welcome_to_vinyl_music_player">"Vítejte ve Vinyl Music Playeru, krásném a lehkém přehrávači pro Android. "</string>
+    <string name="welcome_to_needle_music_player">"Vítejte ve Needle Music Playeru, krásném a lehkém přehrávači pro Android. "</string>
     <string name="open_playing_queue_instruction">"Potáhněte kartu v obrazovce Právě přehrávané nahoru pro zobrazení celé fronty přehrávání. "</string>
     <string name="rearrange_playing_queue_instruction">"Změňte pořadí fronty přetažením skladby za její číslo. "</string>
     <string name="library">"Knihovna "</string>
@@ -225,10 +225,10 @@
     <string name="could_not_scan_files">Nelze skenovat %d souborů.</string>
     <string name="listing_files">Načítání souborů</string>
     <string name="new_start_directory">%s je nová domovská složka.</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Velký</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Klasický</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Malý</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Karta</string>
+    <string name="app_widget_big_name">Needle Music Player - Velký</string>
+    <string name="app_widget_classic_name">Needle Music Player - Klasický</string>
+    <string name="app_widget_small_name">Needle Music Player - Malý</string>
+    <string name="app_widget_card_name">Needle Music Player - Karta</string>
     <string name="report_an_issue">Nahlásit problém</string>
     <string name="bug_report_issue">Problém</string>
     <string name="login">Přihlášení</string>

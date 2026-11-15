@@ -196,7 +196,7 @@
     <string name="report_bugs">Raportaţi probleme</string>
     <string name="report_bugs_summary">Raportați probleme sau solicitați noi funcții.</string>
     <string name="rate_on_google_play">Evaluaţi</string>
-    <string name="rate_on_google_play_summary">Lăsați o evaluare pozitivă pe Google Play dacă vă place Vinyl Music Player.</string>
+    <string name="rate_on_google_play_summary">Lăsați o evaluare pozitivă pe Google Play dacă vă place Needle Music Player.</string>
     <string name="aidan_follestad_summary">Pentru motorul tematic și câteva alte lucruri minunate.</string>
     <string name="michael_cook_summary">Pentru pictograma drăguţă a aplicației în stil material.</string>
     <string name="maarten_corpel_summary">Pentru ilustrația din magazinului Play și coperta albumului gol.</string>
@@ -205,7 +205,7 @@
     <string name="up_next">Urmează</string>
     <string name="pref_title_now_playing_screen_appearance">Aspect</string>
     <string name="intro_label">Introducere</string>
-    <string name="welcome_to_vinyl_music_player">"Bine ați venit la Vinyl Music Player, un player muzical frumos și ușor pentru Android. "</string>
+    <string name="welcome_to_needle_music_player">"Bine ați venit la Needle Music Player, un player muzical frumos și ușor pentru Android. "</string>
     <string name="open_playing_queue_instruction">Glisați cardul în ecranul de redare acum pentru a afișa coada de redare completă.</string>
     <string name="rearrange_playing_queue_instruction">Rearanjați coada de redare prin glisarea unei melodii de la numărul piesei sale.</string>
     <string name="library">Bibliotecă</string>
@@ -218,10 +218,10 @@
     <string name="could_not_scan_files">Nu s-au putut scana %d fişiere.</string>
     <string name="listing_files">Listare fişiere</string>
     <string name="new_start_directory">%s este noul director de pornire.</string>
-    <string name="app_widget_big_name">Vinyl Music Player - Mare</string>
-    <string name="app_widget_classic_name">Vinyl Music Player - Clasic</string>
-    <string name="app_widget_small_name">Vinyl Music Player - Mic</string>
-    <string name="app_widget_card_name">Vinyl Music Player - Card</string>
+    <string name="app_widget_big_name">Needle Music Player - Mare</string>
+    <string name="app_widget_classic_name">Needle Music Player - Clasic</string>
+    <string name="app_widget_small_name">Needle Music Player - Mic</string>
+    <string name="app_widget_card_name">Needle Music Player - Card</string>
     <string name="report_an_issue">Raportați o problemă</string>
     <string name="bug_report_issue">Problemă</string>
     <string name="login">Login</string>

@@ -1,31 +1,49 @@
-# Vinyl Music Player
+# Needle Music Player
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/VinylMusicPlayer/VinylMusicPlayer/blob/master/LICENSE.txt)
+![Needle](art/needle-banner.png)
 
-[![GithubActions CI](https://github.com/VinylMusicPlayer/VinylMusicPlayer/actions/workflows/ci.yml/badge.svg)](https://github.com/VinylMusicPlayer/VinylMusicPlayer/actions/workflows/ci.yml)
+**Needle** is an open-source local music player for Android, independently forked
+from [Vinyl Music Player](https://github.com/VinylMusicPlayer/VinylMusicPlayer),
+which is based on [Phonograph](https://github.com/kabouzeid/Phonograph).
 
-[![Get it on Github](https://img.shields.io/badge/Download_from_Github-pre--release-brightgreen?logo=github&logoColor=lightgrey)](https://github.com/VinylMusicPlayer/VinylMusicPlayer/releases/tag/pre-release)
-[![Get it on F-Droid](https://img.shields.io/f-droid/v/com.poupa.vinylmusicplayer?color=brightgreen&logo=f-droid&logoColor=lightgrey)](https://f-droid.org/packages/com.poupa.vinylmusicplayer/)
-[![Get it on Google Play](https://img.shields.io/endpoint?color=brightgreen&logo=google-play&logoColor=lightgrey&url=https%3A%2F%2Fplay.cuzi.workers.dev%2Fplay%3Fi%3Dcom.poupa.vinylmusicplayer%26l%3DGoogle%2520Play%2520Store%26m%3D%24version)](https://play.google.com/store/apps/details?id=com.poupa.vinylmusicplayer)
-<!--
-Above: Dynamic badge based on https://shields.io/endpoint (the badge service) and https://play.cuzi.workers.dev/ (play 
-store scraper)
-See https://github.com/badges/shields/issues/358#issuecomment-806235967
--->
+Features include Android Auto, ReplayGain, playlists, widgets and tag editing.
 
-**A material designed local music player for Android.**
+## Project
 
-**Forked from [Phonograph](https://github.com/kabouzeid/Phonograph); makes all Pro features free, as they used to be.**
+- [Source and issues](https://github.com/omblivion/VinylMusicPlayer)
+- [Privacy](PRIVACY.md)
+- [License: GPL v3](LICENSE.txt)
+- [Stability and rebranding progress](docs/needle-modernization-plan.md)
+- [Remaining audit backlog](docs/needle-audit-backlog.md)
+- [Device validation checklist](docs/needle-device-checklist.md)
+- [Historical upstream changelog](CHANGELOG.md)
 
-Additional features:
-* Android Auto support
-* ReplayGain
-* SD Card write access
-* [...and more!](https://github.com/VinylMusicPlayer/VinylMusicPlayer/blob/master/CHANGELOG.md)
+Needle uses application ID `io.github.omblivion.needle` and can be installed beside
+Vinyl. Each app has its own settings, database, widgets and shortcuts. Music files
+are shared: editing tags or deleting files in either app affects both libraries.
+There is no Needle Google Play or F-Droid listing configured in this repository.
 
-![Screenshots](./art/art.png?raw=true)
+## Build
 
-Icon made by [Nikita Golubev](https://www.flaticon.com/authors/nikita-golubev) from www.flaticon.com
+Requires JDK 17 and Android SDK platform 34. Set `JAVA_HOME` and `ANDROID_HOME`, or
+configure the SDK path in your untracked `local.properties`.
 
-Album image by [Virginia State Parks](https://www.flickr.com/photos/vastateparksstaff/38645226714/) (CC BY 2.0)
+```sh
+./gradlew testFdroidDebugUnitTest assembleFdroidDebug lintFdroidDebug
+```
 
+On Windows use `gradlew.bat`. Debug builds need no release credentials and use the
+`.debug` application ID suffix. Release signing is optional and configured with an
+untracked `keystore.properties`. CI validates builds and tests; it does not publish
+to any store.
+
+## Attribution
+
+Original authors, contributors, licenses and upstream issue links are retained.
+The bundled credits describe the original projects' contributors.
+
+Needle launcher artwork and banner are supplied with this fork in `art/`.
+Original upstream icon by [Nikita Golubev](https://www.flaticon.com/authors/nikita-golubev)
+from www.flaticon.com. Album image by
+[Virginia State Parks](https://www.flickr.com/photos/vastateparksstaff/38645226714/)
+(CC BY 2.0).

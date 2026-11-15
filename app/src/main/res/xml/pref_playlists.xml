@@ -3,19 +3,19 @@
 
     <com.kabouzeid.appthemehelper.common.prefs.supportv7.ATEPreferenceCategory android:title="@string/pref_header_playlists">
 
-        <com.poupa.vinylmusicplayer.preferences.SmartPlaylistPreference
+        <io.github.omblivion.needle.preferences.SmartPlaylistPreference
             app:iconSpaceReserved="false"
             android:key="last_added_interval_v2"
             android:defaultValue="1m"
             android:title="@string/pref_title_last_added_interval" />
 
-        <com.poupa.vinylmusicplayer.preferences.SmartPlaylistPreference
+        <io.github.omblivion.needle.preferences.SmartPlaylistPreference
             app:iconSpaceReserved="false"
             android:key="recently_played_interval_v2"
             android:defaultValue="1m"
             android:title="@string/pref_title_recently_played_interval" />
 
-        <com.poupa.vinylmusicplayer.preferences.SmartPlaylistPreference
+        <io.github.omblivion.needle.preferences.SmartPlaylistPreference
             app:iconSpaceReserved="false"
             android:key="not_recently_played_interval_v2"
             android:defaultValue="1m"

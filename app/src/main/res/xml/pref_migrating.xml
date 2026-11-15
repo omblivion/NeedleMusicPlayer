@@ -3,7 +3,7 @@
 
     <com.kabouzeid.appthemehelper.common.prefs.supportv7.ATEPreferenceCategory android:title="@string/pref_header_migrating">
 
-        <com.poupa.vinylmusicplayer.preferences.ExportSettingsPreference
+        <io.github.omblivion.needle.preferences.ExportSettingsPreference
             app:iconSpaceReserved="false"
             android:key="export_settings"
             android:defaultValue="1m"

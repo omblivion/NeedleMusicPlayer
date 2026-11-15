@@ -8,12 +8,12 @@
     tools:ignore="UnusedAttribute">
 
     <!-- for getSwipeableContainerView() -->
-    <com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout
+    <io.github.omblivion.needle.views.TouchInterceptFrameLayout
         android:id="@+id/touch_intercept_framelayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <com.poupa.vinylmusicplayer.views.IconImageView
+        <io.github.omblivion.needle.views.IconImageView
             android:id="@+id/drag_view"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
@@ -85,19 +85,19 @@
                 android:paddingRight="0dp"
                 android:paddingStart="16dp">
 
-                <com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView
+                <io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView
                     android:id="@+id/title_scrollview"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content">
 
-                    <com.poupa.vinylmusicplayer.views.AutoTruncateTextView
+                    <io.github.omblivion.needle.views.AutoTruncateTextView
                         android:id="@+id/title"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif"
                         android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
 
-                </com.poupa.vinylmusicplayer.views.TouchInterceptHorizontalScrollView>
+                </io.github.omblivion.needle.views.TouchInterceptHorizontalScrollView>
 
                 <TextView
                     android:id="@+id/text"
@@ -109,7 +109,7 @@
                     android:textColor="?android:textColorSecondary" />
             </LinearLayout>
 
-            <com.poupa.vinylmusicplayer.views.IconImageView
+            <io.github.omblivion.needle.views.IconImageView
                 android:id="@+id/menu"
                 style="@style/OverFlowButton"
                 android:layout_gravity="center_vertical"
@@ -134,6 +134,6 @@
             android:layout_marginStart="72dp"
             android:background="?attr/dividerColor" />
 
-    </com.poupa.vinylmusicplayer.views.TouchInterceptFrameLayout>
+    </io.github.omblivion.needle.views.TouchInterceptFrameLayout>
 
 </FrameLayout>

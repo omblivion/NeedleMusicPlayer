@@ -172,7 +172,7 @@
     <string name="up_next">التالي</string>
     <string name="pref_title_now_playing_screen_appearance">المظهر</string>
     <string name="intro_label">المقدمة</string>
-    <string name="welcome_to_vinyl_music_player">"مرحباً في Vinyl Music Player، مشغل موسيقى خفيف وأنيق على منصة أندرويد."</string>
+    <string name="welcome_to_needle_music_player">"مرحباً في Needle Music Player، مشغل موسيقى خفيف وأنيق على منصة أندرويد."</string>
     <string name="open_playing_queue_instruction">اسحب البطاقة في شاشة \"تستمع الآن\" لإظهار جميع المقطوعات على قائمة الانتظار</string>
     <string name="rearrange_playing_queue_instruction">إعادة ترتيب القائمة بواسطة سحب المقطوعة من رقمها</string>
     <string name="library">المكتبة</string>

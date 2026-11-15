@@ -14,6 +14,7 @@ readonly md_section_comment="<!-- Release notes generated " # This must match wh
 readonly md_section_full_changelog="**Full Changelog**:" # This must match whatever Github puts in the generated .md
 
 readonly remote=origin
+readonly repository="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 readonly release_branch="master"
 readonly previous_version="$(grep -w versionName ${build_specs} | sed "s/'//g" | awk '{print $2;}')"
 readonly previous_version_code="$(grep -w versionCode ${build_specs} | awk '{print $2;}')"
@@ -68,7 +69,7 @@ log_info "Collecting change log since '${previous_version}'..." \
       --method POST \
       -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
-      /repos/VinylMusicPlayer/VinylMusicPlayer/releases/generate-notes \
+      "/repos/${repository}/releases/generate-notes" \
       -f tag_name="${new_version}" \
       -f target_commitish="${release_branch}" \
       -f previous_tag_name="${previous_version}" \
@@ -112,7 +113,7 @@ log_info "Update the '${changelog_md}'..." \
     echo "## [${new_version}] - ${new_version_date}"; \
     printf "${changelog}"; \
     echo; echo; \
-    echo "${md_section_full_changelog} https://github.com/VinylMusicPlayer/VinylMusicPlayer/compare/${previous_version}...${new_version}"
+    echo "${md_section_full_changelog} https://github.com/${repository}/compare/${previous_version}...${new_version}"
     cat "${changelog_md}" | grep -v "${md_section_title}" \
     ) > "${new_changelog_md}" \
   && cp "${new_changelog_md}" "${changelog_md}" \
@@ -142,8 +143,8 @@ fi
 
 log_warn "To finalize publishing the new version: Please push the changes (including tags) + Create a Github pull request"
 log_warn "> git push -u ${remote} ${new_branch}"
-log_warn "> open 'https://github.com/VinylMusicPlayer/VinylMusicPlayer/pull/new/${new_branch}'"
+log_warn "> open 'https://github.com/${repository}/pull/new/${new_branch}'"
 log_warn "Then create a new tag on master, i.e:"
 log_warn "> git tag -a ${new_version}"
 log_warn "> git push ${remote} refs/tags/${new_version}"
-log_warn "The new tag will trigger build and delivery on Play Store"
+log_warn "CI validates builds only; publishing Needle requires separate release configuration."

@@ -219,7 +219,7 @@
     <string name="report_bugs">Informa d\'un problema</string>
     <string name="report_bugs_summary">Informa d\'un problema o demana noves funcionalitats.</string>
     <string name="rate_on_google_play">Puntua</string>
-    <string name="rate_on_google_play_summary">Deixeu una puntuació positiva a Google Play si us agrada el reproductor de música Vinyl.</string>
+    <string name="rate_on_google_play_summary">Deixeu una puntuació positiva a Google Play si us agrada el reproductor de música Needle.</string>
     <string name="aidan_follestad_summary">Pel motor de temes i altres coses fantàstiques.</string>
     <string name="karim_abou_zeid_summary">Autor original.</string>
     <string name="michael_cook_summary">Per la bonica icona de l\'aplicació.</string>
@@ -229,7 +229,7 @@
     <string name="up_next">A continuació</string>
     <string name="pref_title_now_playing_screen_appearance">Aparença</string>
     <string name="intro_label">Introducció</string>
-    <string name="welcome_to_vinyl_music_player">Benvingut al Vinyl, un reproductor de música bonic i lleuger per a Android.</string>
+    <string name="welcome_to_needle_music_player">Benvingut al Needle, un reproductor de música bonic i lleuger per a Android.</string>
     <string name="open_playing_queue_instruction">Feu lliscar la targeta de la pantalla de reproducció per mostrar la cua de reproducció.</string>
     <string name="rearrange_playing_queue_instruction">Reordeneu la cua de reproducció arrossegant les cançons pel seu número de pista.</string>
     <string name="library">Col·lecció</string>
@@ -245,11 +245,11 @@
     <string name="could_not_scan_files">No s\'han pogut escanejar %d fitxers.</string>
     <string name="listing_files">Llistant els fitxers</string>
     <string name="new_start_directory">%s és el nou directori d\'inici.</string>
-    <string name="app_widget_big_name">Vinyl - Gran</string>
-    <string name="app_widget_classic_name">Vinyl - Clàssic</string>
-    <string name="app_widget_small_name">Vinyl - Petit</string>
-    <string name="app_widget_card_name">Vinyl - Targeta</string>
-    <string name="app_crashed">El reproductor de música Vinyl ha fallat</string>
+    <string name="app_widget_big_name">Needle - Gran</string>
+    <string name="app_widget_classic_name">Needle - Clàssic</string>
+    <string name="app_widget_small_name">Needle - Petit</string>
+    <string name="app_widget_card_name">Needle - Targeta</string>
+    <string name="app_crashed">El reproductor de música Needle ha fallat</string>
     <string name="report_a_crash_invitation">Disculpeu les molèsties. S\'han recopilat dades tècniques relacionades amb la fallada que poden ajudar els desenvolupadors a millorar aquesta situació. Esteu convidats a enviar un informe d\'error, podeu revisar les dades recollides i decidir quines dades enviareu a les pantalles següents.</string>
     <string name="report_a_crash">Envia un informe</string>
     <string name="report_an_issue">Informa d\'un problema</string>
@@ -288,7 +288,7 @@
     <string name="adrian_summary">Per crear el disseny de la pàgina d\'àlbum.</string>
     <string name="idle_notification_description">La notificació d\'inactivitat es fa servir quan la cua de reproducció està buida</string>
     <string name="idle_notification_name">Notificació d\'inactivitat</string>
-    <string name="idle_notification_title">El Vinyl s\'està executant</string>
+    <string name="idle_notification_title">El Needle s\'està executant</string>
     <string name="add_action">Afegeix</string>
     <string name="blacklist">Llista negra</string>
     <string name="remove_from_blacklist">Suprimeix de la llista negra</string>
@@ -310,7 +310,7 @@
     <string name="sort_order_date_added_reverse">Addició - Recents primer</string>
     <string name="finish_current_music_sleep_timer">Finalitza l\'última cançó</string>
     <string name="dialog_ringtone_title">Estableix el to de trucada</string>
-    <string name="dialog_ringtone_message">Permet al Vinyl modificar els paràmetres del sistema en la pantalla següent per establir el to de trucada.</string>
+    <string name="dialog_ringtone_message">Permet al Needle modificar els paràmetres del sistema en la pantalla següent per establir el to de trucada.</string>
     <string name="action_scan_directory">Escaneja el directori</string>
     <string name="reset_discography_warning">Això esborrarà i reconstruirà la base de dades de cançons interna de l\'aplicació.\n\nNo se suprimirà cap cançó durant aquesta operació, però és possible que s\'esborri l\'historial de reproducció.\n\nDurant una bona estona, fins que no s\'hagi completat l\'escaneig, no podreu utilitzar l\'aplicació amb normalitat.</string>
     <string name="none">Cap</string>

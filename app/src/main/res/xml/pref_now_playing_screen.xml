@@ -4,7 +4,7 @@
 
     <com.kabouzeid.appthemehelper.common.prefs.supportv7.ATEPreferenceCategory android:title="@string/pref_header_now_playing_screen">
 
-        <com.poupa.vinylmusicplayer.preferences.NowPlayingScreenPreference
+        <io.github.omblivion.needle.preferences.NowPlayingScreenPreference
             app:iconSpaceReserved="false"
             android:key="now_playing_screen_id"
             android:title="@string/pref_title_now_playing_screen_appearance" />
@@ -30,7 +30,7 @@
             android:summary="@string/pref_summary_show_song_number"
             android:title="@string/pref_title_show_song_number" />
 
-        <com.poupa.vinylmusicplayer.preferences.SongConfirmationPreference
+        <io.github.omblivion.needle.preferences.SongConfirmationPreference
             app:iconSpaceReserved="false"
             android:key="enqueue_songs_default_choice"
             android:title="@string/pref_title_enqueue_song_default_choice"

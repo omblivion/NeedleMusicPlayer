@@ -40,7 +40,7 @@
             android:positiveButtonText="@null"
             android:title="@string/pref_title_rg_source_mode" />
 
-        <com.poupa.vinylmusicplayer.preferences.PreAmpPreference
+        <io.github.omblivion.needle.preferences.PreAmpPreference
             app:iconSpaceReserved="false"
             android:key="replaygain_preamp"
             android:summary="@string/pref_summary_rg_preamp"
