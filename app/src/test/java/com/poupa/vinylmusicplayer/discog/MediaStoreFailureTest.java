@@ -65,13 +65,35 @@ public class MediaStoreFailureTest {
         assertEquals(0, discography.getAllSongs(null).size());
     }
 
+    @Test
+    public void folderBlacklistDoesNotExcludeSiblingWithSamePrefix() throws Exception {
+        java.io.File root = RuntimeEnvironment.getApplication().getCacheDir();
+        java.io.File music = new java.io.File(root, "Music");
+        java.io.File sibling = new java.io.File(root, "MusicBackup");
+        music.mkdirs();
+        sibling.mkdirs();
+        java.io.File songFile = new java.io.File(sibling, "track.mp3");
+        songFile.createNewFile();
+        provider.songPath = songFile.getPath();
+        BlacklistStore.getInstance(RuntimeEnvironment.getApplication()).addPath(music);
+        discography.syncWithMediaStore(progress -> {});
+        assertEquals(1, discography.getAllSongs(null).size());
+    }
+
     public static class ScanProvider extends ContentProvider {
         boolean fail;
         boolean empty;
+        String songPath;
         @Override public boolean onCreate() { return true; }
         @Override public Cursor query(Uri uri, String[] projection, String selection,
                 String[] args, String order) {
             if (fail) throw new SecurityException("Audio permission revoked");
+            if (songPath != null) {
+                MatrixCursor cursor = new MatrixCursor(projection);
+                cursor.addRow(new Object[] {99L, "Sibling track", 1, 2024, 1000L, songPath,
+                        0L, 0L, 1L, "Album", "Artist"});
+                return cursor;
+            }
             return empty ? new MatrixCursor(projection) : null;
         }
         @Override public String getType(Uri uri) { return null; }

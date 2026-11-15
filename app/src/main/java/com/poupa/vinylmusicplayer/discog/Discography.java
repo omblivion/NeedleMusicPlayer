@@ -390,7 +390,7 @@ public class Discography implements MusicServiceEventListener {
         final String startPath = FileUtil.safeGetCanonicalPath(startDirectory);
         final Predicate<Song> isNotWhiteListed = (s) -> {
             if (PreferenceUtil.getInstance().getWhitelistEnabled()) {
-                return !s.data.startsWith(startPath);
+                return !isInDirectory(s.data, startPath);
             }
             return false;
         };
@@ -399,7 +399,7 @@ public class Discography implements MusicServiceEventListener {
         final ArrayList<String> blackListedPaths = BlacklistStore.getInstance(context).getPaths();
         final Predicate<Song> isBlackListed = (s) -> {
             for (final String path : blackListedPaths) {
-                if (s.data.startsWith(path)) return true;
+                if (isInDirectory(s.data, path)) return true;
             }
             return false;
         };
@@ -427,6 +427,13 @@ public class Discography implements MusicServiceEventListener {
         }
 
         return counters;
+    }
+
+    private static boolean isInDirectory(String filePath, String directoryPath) {
+        String directory = FileUtil.safeGetCanonicalPath(new File(directoryPath));
+        String file = FileUtil.safeGetCanonicalPath(new File(filePath));
+        return file.equals(directory) || file.startsWith(directory.endsWith(File.separator)
+                ? directory : directory + File.separator);
     }
 
     @Override

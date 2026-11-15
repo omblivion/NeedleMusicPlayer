@@ -17,11 +17,11 @@ both apps.
 
 - [x] Establish JDK 17 baseline: `testFdroidDebugUnitTest` (11 tests passing).
 - [x] Add behavioral regression coverage for Android boundaries.
-- [ ] Preserve the library on failed scans; validate folder boundaries.
+- [x] Preserve the library on failed scans; validate folder boundaries.
 - [x] Save both queues atomically.
 - [x] Validate preference imports before applying; restore ReplayGain types.
-- [ ] Stream tag writes and truncate destination; close resources on failure.
-- [ ] Isolate gapless preload errors; separate optional permissions.
+- [x] Stream tag writes and truncate destination; close resources on failure.
+- [x] Isolate gapless preload errors; separate optional permissions.
 - [ ] Rename application, packages, resources and active project links.
 - [ ] Verify unit tests, debug APK, release shrinking and lint.
 - [ ] Independent review; document remaining audit/performance work.
@@ -46,6 +46,17 @@ widgets and real provider write failures; do not report them as tested locally.
 - Scan/import/queue regression cases observed failing before fixes; 21-test suite
   now passes. SQLite trigger simulates failure while saving the second queue.
   Robolectric singleton reset is confined to tests.
+- Second regression pass: 27 tests green, including sibling folder filters,
+  optional permission denial, failed gapless preload, shorter tag replacement and
+  failed tag encoding without truncation. The tag provider fixture was corrected
+  to attach its authority; the original writer then demonstrably left trailing
+  bytes (RED), and the streaming/truncating writer passed (GREEN).
+- Deferred: discography listener/threading redesign and moving initial DB loading
+  off the main thread require separate lifecycle tests and performance measurements.
+  A collection-type-only change would not establish the required invariants.
+- Ruling: writes are bounded-memory and truncate correctly, but are not atomic
+  across external providers. IO failure during replacement remains a device-test
+  and recovery-design concern; do not claim crash-safe music-file replacement.
 - Ruling: this document records the conversational plan rather than inventing a
   missing earlier spec. Broad architectural rewrites and SDK upgrades are not
   part of this regression-fix/rebrand patch; the cost is deferred modernization.

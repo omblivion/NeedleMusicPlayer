@@ -385,6 +385,19 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
 
     @Override
     public boolean onError(final MediaPlayer mp, final int what, final int extra) {
+        if (mp != mCurrentMediaPlayer) {
+            // A failed preload must not reset the track currently playing.
+            if (mp == mNextMediaPlayer) {
+                try {
+                    mCurrentMediaPlayer.setNextMediaPlayer(null);
+                } catch (IllegalArgumentException | IllegalStateException error) {
+                    OopsHandler.collectStackTrace(error);
+                }
+                mNextMediaPlayer.release();
+                mNextMediaPlayer = null;
+            }
+            return true; // Do not dispatch onCompletion for the failed preload.
+        }
         if (mp == mCurrentMediaPlayer) {
             if (context != null) {
                 SafeToast.show(context, context.getResources().getString(R.string.unplayable_file));
@@ -401,14 +414,6 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             } else {
                 mCurrentMediaPlayer = new MediaPlayer();
                 mCurrentMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
-            }
-        } else {
-            mIsInitialized = false;
-            mCurrentMediaPlayer.release();
-            mCurrentMediaPlayer = new MediaPlayer();
-            mCurrentMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
-            if (context != null) {
-                SafeToast.show(context, context.getResources().getString(R.string.unplayable_file));
             }
         }
         return false;

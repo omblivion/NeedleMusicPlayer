@@ -203,16 +203,20 @@ SAFUtil {
 
         Uri uri = getUriFromSong(song);
 
-        try (ParcelFileDescriptor pfd = context.getContentResolver().openFileDescriptor(uri, "rw")) {
-            // Save the in-memory tags to the backing file
+        try {
+            // Encode and open the complete replacement before touching the original.
             tempAudio.get().commit();
-
-            // now read persisted data and write it to real FD provided by SAF
-            FileInputStream fis = new FileInputStream(tempAudio.get().getFile());
-            byte[] audioContent = FileUtil.readBytes(fis);
-            FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor());
-            fos.write(audioContent);
-            fos.close();
+            try (FileInputStream input = new FileInputStream(tempAudio.get().getFile());
+                 ParcelFileDescriptor pfd = context.getContentResolver().openFileDescriptor(uri, "rwt")) {
+                if (pfd == null) throw new java.io.IOException("Could not open audio destination");
+                try (FileOutputStream output = new FileOutputStream(pfd.getFileDescriptor())) {
+                    byte[] buffer = new byte[64 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                    }
+                }
+            }
         } catch (final Exception e) {
             OopsHandler.collectStackTrace(e);
             toast(context, String.format(context.getString(R.string.saf_write_failed), e.getLocalizedMessage()));

@@ -89,8 +89,9 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
     }
 
     protected boolean hasPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && permissions != null) {
-            for (String permission : permissions) {
+        String[] required = getRequiredPermissions();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && required != null) {
+            for (String permission : required) {
                 if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
                     return false;
                 }
@@ -99,18 +100,24 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
         return true;
     }
 
+    protected String[] getRequiredPermissions() {
+        return permissions;
+    }
+
     @Override
     public void onRequestPermissionsResult(final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST) {
-            for (final int grantResult : grantResults) {
-                if (grantResult != PackageManager.PERMISSION_GRANTED) {
+            String[] required = getRequiredPermissions();
+            for (int i = 0; i < grantResults.length; i++) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED
+                        && required != null && java.util.Arrays.asList(required).contains(permissions[i])) {
                     final String message = getPermissionDeniedMessage();
                     try {
                         final View container = getSnackBarContainer();
                         final Snackbar snackbar = Snackbar.make(container, message, BaseTransientBottomBar.LENGTH_INDEFINITE);
 
-                        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                        if (ActivityCompat.shouldShowRequestPermissionRationale(this, permissions[i])) {
                             //User has denied from permission dialog
                             snackbar.setAction(R.string.action_grant, view -> requestPermissions())
                                     .setActionTextColor(ThemeStore.accentColor(this))
@@ -139,8 +146,8 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
                     }
                 }
             }
-            hadPermissions = true;
-            onHasPermissionsChanged(true);
+            hadPermissions = hasPermissions();
+            onHasPermissionsChanged(hadPermissions);
         }
     }
 }
