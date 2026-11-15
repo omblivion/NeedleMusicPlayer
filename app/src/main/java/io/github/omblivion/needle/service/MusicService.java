@@ -1203,7 +1203,12 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 final Song currentSong = getCurrentSong();
                 HistoryStore.getInstance(this).addSongId(currentSong.id);
                 if (PreferenceUtil.getInstance().maintainTopTrackPlaylist() && songPlayCountHelper.shouldBumpPlayCount()) {
-                    SongPlayCountStore.getInstance(this).bumpPlayCount(songPlayCountHelper.getSong().id);
+                    // TODO(task-3): capture the occurrence and reset version when tracking
+                    // begins and notify top-track consumers separately.
+                    long playedId = songPlayCountHelper.getSong().id;
+                    SongPlayCountStore store = SongPlayCountStore.getInstance(this);
+                    store.recordPlay(playedId, System.currentTimeMillis(),
+                            java.util.UUID.randomUUID().toString(), store.getResetVersion(playedId));
                 }
                 songPlayCountHelper.notifySongChanged(currentSong);
                 break;

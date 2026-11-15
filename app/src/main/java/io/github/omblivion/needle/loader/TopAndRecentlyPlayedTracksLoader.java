@@ -24,6 +24,7 @@ import androidx.annotation.NonNull;
 
 import io.github.omblivion.needle.discog.Discography;
 import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.model.TopTracksWindow;
 import io.github.omblivion.needle.provider.HistoryStore;
 import io.github.omblivion.needle.provider.SongPlayCountStore;
 import io.github.omblivion.needle.provider.StoreLoader;
@@ -82,8 +83,10 @@ public class TopAndRecentlyPlayedTracksLoader {
         if (!enabled) {return new ArrayList<>();}
 
         final int NUMBER_OF_TOP_TRACKS = 100;
-        try (Cursor cursor = SongPlayCountStore.getInstance(context).getTopPlayedResults(NUMBER_OF_TOP_TRACKS)) {
-            ArrayList<Long> songIds = StoreLoader.getIdsFromCursor(cursor, SongPlayCountStore.SongPlayCountColumns.ID);
+        // TODO(task-5): read the persisted TopTracksWindow preference here.
+        try (Cursor cursor = SongPlayCountStore.getInstance(context).getTopPlayedResults(
+                NUMBER_OF_TOP_TRACKS, TopTracksWindow.WEEKS_52, System.currentTimeMillis())) {
+            ArrayList<Long> songIds = StoreLoader.getIdsFromCursor(cursor, SongPlayCountStore.Columns.ID);
             Discography discography = Discography.getInstance();
             return discography.getSongsFromIdsAndCleanupOrphans(songIds, null);
         } catch (SQLiteException|IllegalStateException exception) {
