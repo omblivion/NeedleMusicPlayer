@@ -1,7 +1,6 @@
 package io.github.omblivion.needle.ui.activities.tageditor;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -20,12 +19,32 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.ShadowActivity;
 import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 21, application = App.class)
+@Config(sdk = 34, application = App.class, shadows = {TagEditorPickerTest.ShadowMediaStoreWriteRequest.class})
 public class TagEditorPickerTest {
+
+    /**
+     * Robolectric does not implement {@code MediaStore.createWriteRequest}; its
+     * internal {@code ContentResolver.call} returns null and the API 30+ tag
+     * editor crashes on open. Return a harmless PendingIntent so the real
+     * activity-result wiring under test can run.
+     */
+    @Implements(className = "android.provider.MediaStore")
+    public static class ShadowMediaStoreWriteRequest {
+        @Implementation
+        protected static android.app.PendingIntent createWriteRequest(
+                android.content.ContentResolver resolver, java.util.Collection<android.net.Uri> uris) {
+            return android.app.PendingIntent.getActivity(
+                    org.robolectric.RuntimeEnvironment.getApplication(), 0,
+                    new android.content.Intent(), android.app.PendingIntent.FLAG_IMMUTABLE);
+        }
+    }
+
     public static class Editor extends SongTagEditorActivity {
         @Override protected void setUpViews() {
             // Do not read actual audio files; keep the real activity-result wiring.
@@ -70,18 +89,12 @@ public class TagEditorPickerTest {
     }
 
     @Test
-    public void legacySdkBranchDoesNotRegisterTreePicker() {
-        // Robolectric 4.14 has no API 19 image. Exercise branching on the API 21
-        // runtime without claiming this is an API 19 compatibility/device test.
-        int sdk = android.os.Build.VERSION.SDK_INT;
-        ReflectionHelpers.setStaticField(android.os.Build.VERSION.class, "SDK_INT", 19);
-        try {
-            try (org.robolectric.android.controller.ActivityController<Editor> controller =
-                         Robolectric.buildActivity(Editor.class).setup()) {
-                assertNull(ReflectionHelpers.getField(controller.get(), "writeTagsApi21_SAFTreePicker"));
-            }
-        } finally {
-            ReflectionHelpers.setStaticField(android.os.Build.VERSION.class, "SDK_INT", sdk);
+    public void treePickerIsRegisteredOnCurrentApi() {
+        // minSdk is 34, so the SAF tree picker is always registered; the old
+        // API 19 branch no longer exists.
+        try (org.robolectric.android.controller.ActivityController<Editor> controller =
+                     Robolectric.buildActivity(Editor.class).setup()) {
+            assertTrue(ReflectionHelpers.getField(controller.get(), "writeTagsApi21_SAFTreePicker") != null);
         }
     }
 

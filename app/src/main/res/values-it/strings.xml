@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="upstream_source_code">Codice sorgente originale di Vinyl</string>
     <string name="what_do_you_want_to_share">Cosa vuoi condividere?</string>
     <string name="currently_listening_to_x_by_x">Stai ascoltando %1$s di %2$s.</string>
     <string name="the_audio_file">Il file audio</string>

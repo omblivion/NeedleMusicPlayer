@@ -14,7 +14,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class QueueSaveHandlerTest {
     @Test
     public void failedSaveDoesNotKillHandlerOrPreventNextSave() {

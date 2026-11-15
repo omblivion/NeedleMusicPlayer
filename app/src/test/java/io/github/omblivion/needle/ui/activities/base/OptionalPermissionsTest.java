@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config;
 import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 33, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class OptionalPermissionsTest {
     public static class PermissionActivity extends AbsMusicServiceActivity {}
 

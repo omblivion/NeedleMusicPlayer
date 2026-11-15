@@ -83,7 +83,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     public static final String TAG = MusicService.class.getSimpleName();
 
-    static final String NEEDLE_MUSIC_PLAYER_PACKAGE_NAME = "io.github.omblivion.needle";
+    static final String NEEDLE_MUSIC_PLAYER_PACKAGE_NAME = io.github.omblivion.needle.BuildConfig.APPLICATION_ID;
     private static final String MUSIC_PACKAGE_NAME = "com.android.music";
 
     public static final String ACTION_TOGGLE_PAUSE = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".togglepause";
@@ -251,8 +251,8 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
         uiThreadHandler = new Handler();
 
-        registerReceiver(widgetIntentReceiver, new IntentFilter(APP_WIDGET_UPDATE));
-        registerReceiver(updateFavoriteReceiver, new IntentFilter(FAVORITE_STATE_CHANGED));
+        registerReceiver(widgetIntentReceiver, new IntentFilter(APP_WIDGET_UPDATE), Context.RECEIVER_NOT_EXPORTED);
+        registerReceiver(updateFavoriteReceiver, new IntentFilter(FAVORITE_STATE_CHANGED), Context.RECEIVER_NOT_EXPORTED);
 
         initNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -273,7 +273,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         mPackageValidator = new PackageValidator(this, R.xml.allowed_media_browser_callers);
         mBrowsableMusicProvider = new BrowsableMusicProvider(this);
 
-        sendBroadcast(new Intent(NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".NEEDLE_MUSIC_PLAYER_MUSIC_SERVICE_CREATED"));
+        sendBroadcast(new Intent(NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".MUSIC_SERVICE_CREATED").setPackage(getPackageName()));
 
         Discography.getInstance().addChangedListener(onDiscographyChanged);
         mediaStoreObserver.onChange(true);
@@ -396,7 +396,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         PreferenceUtil.getInstance().unregisterOnSharedPreferenceChangedListener(this);
         wakeLock.release();
 
-        sendBroadcast(new Intent(NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".NEEDLE_MUSIC_PLAYER_MUSIC_SERVICE_DESTROYED"));
+        sendBroadcast(new Intent(NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".MUSIC_SERVICE_DESTROYED").setPackage(getPackageName()));
     }
 
     @Override
@@ -518,7 +518,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         stopForeground(true);
 
         closeAudioEffectSession();
-        getAudioManager().abandonAudioFocus(audioFocusListener);
+        getAudioManager().abandonAudioFocusRequest(focusRequest);
         stopSelf();
     }
 
@@ -1026,7 +1026,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                     } else {
                         playback.start();
                         if (!becomingNoisyReceiverRegistered) {
-                            registerReceiver(becomingNoisyReceiver, becomingNoisyReceiverIntentFilter);
+                            registerReceiver(becomingNoisyReceiver, becomingNoisyReceiverIntentFilter, Context.RECEIVER_NOT_EXPORTED);
                             becomingNoisyReceiverRegistered = true;
                         }
                         if (notHandledMetaChangedForCurrentTrack) {
@@ -1166,7 +1166,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     private void sendChangeInternal(final String what) {
-        sendBroadcast(new Intent(what));
+        sendBroadcast(new Intent(what).setPackage(getPackageName()));
         appWidgetBig.notifyChange(this, what);
         appWidgetClassic.notifyChange(this, what);
         appWidgetSmall.notifyChange(this, what);

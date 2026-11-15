@@ -42,6 +42,8 @@ public class AboutActivity extends AbsBaseActivity implements View.OnClickListen
 
     private static final String GITHUB = "https://github.com/omblivion/VinylMusicPlayer";
 
+    private static final String WEBSITE = "https://adrien.poupa.fr/";
+
     private ActivityAboutBinding layoutBinding;
 
     @Override

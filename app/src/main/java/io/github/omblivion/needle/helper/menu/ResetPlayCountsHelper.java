@@ -31,7 +31,7 @@ public final class ResetPlayCountsHelper {
         final Context appContext = context.getApplicationContext();
         executor.execute(() -> {
             SongPlayCountStore.getInstance(appContext).resetSong(song.id);
-            appContext.sendBroadcast(new Intent(MusicService.STATISTICS_CHANGED));
+            appContext.sendBroadcast(new Intent(MusicService.STATISTICS_CHANGED).setPackage(appContext.getPackageName()));
         });
     }
 }

@@ -23,7 +23,7 @@ import org.robolectric.shadows.ShadowActivity;
 import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 21, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class DeletePickerTest {
     @Before public void resetPreferences() {
         ReflectionHelpers.setStaticField(PreferenceUtil.class, "sInstance", null);

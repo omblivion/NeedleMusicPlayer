@@ -18,7 +18,7 @@ import org.robolectric.shadows.ShadowMediaPlayer;
 import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class GaplessErrorTest {
     @Test
     public void preloadErrorKeepsCurrentTrackPlayingAndDiscardsFailedPreload() {

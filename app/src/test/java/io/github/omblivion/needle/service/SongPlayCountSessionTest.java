@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config;
 import java.util.ArrayList;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class SongPlayCountSessionTest {
 
     @Test

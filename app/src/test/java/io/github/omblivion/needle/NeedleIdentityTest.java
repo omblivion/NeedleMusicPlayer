@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config;
 import java.util.Locale;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class NeedleIdentityTest {
     @Test
     public void applicationAndProviderCanCoexistWithVinyl() throws Exception {

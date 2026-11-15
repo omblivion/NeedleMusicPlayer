@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class MediaStoreFailureTest {
     private Discography discography;
     private final ScanProvider provider = new ScanProvider();

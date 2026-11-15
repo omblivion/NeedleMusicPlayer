@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class SettingsImportTest {
     private SharedPreferences preferences;
     private SharedPreferencesImporter importer;

@@ -27,7 +27,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class TagWriteTest {
     @Test
     public void shorterEditedAudioDoesNotLeaveOldTrailingBytes() throws Exception {

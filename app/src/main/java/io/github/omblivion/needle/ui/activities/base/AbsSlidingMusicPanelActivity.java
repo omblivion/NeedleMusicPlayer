@@ -25,6 +25,7 @@ import io.github.omblivion.needle.ui.fragments.player.MiniPlayerFragment;
 import io.github.omblivion.needle.ui.fragments.player.NowPlayingScreen;
 import io.github.omblivion.needle.ui.fragments.player.card.CardPlayerFragment;
 import io.github.omblivion.needle.ui.fragments.player.flat.FlatPlayerFragment;
+import io.github.omblivion.needle.util.PlaybackInsets;
 import io.github.omblivion.needle.util.PreferenceUtil;
 import io.github.omblivion.needle.util.ViewUtil;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
@@ -241,13 +242,15 @@ public abstract class AbsSlidingMusicPanelActivity extends AbsMusicServiceActivi
     protected SlidingMusicPanelLayoutBinding createSlidingMusicPanel() {
         SlidingMusicPanelLayoutBinding binding = SlidingMusicPanelLayoutBinding.inflate(getLayoutInflater());
         slidingUpPanelLayout = binding.slidingLayout;
+        // Keep system-bar padding outside the legacy panel: its drag math assumes
+        // unpadded coordinates and can otherwise put the controls into HIDDEN.
+        PlaybackInsets.apply(binding.getRoot());
         return binding;
     }
 
     @Override
-    public void onBackPressed() {
-        if (!handleBackPress())
-            super.onBackPressed();
+    protected boolean handleBackPressed() {
+        return handleBackPress() || super.handleBackPressed();
     }
 
     public boolean handleBackPress() {

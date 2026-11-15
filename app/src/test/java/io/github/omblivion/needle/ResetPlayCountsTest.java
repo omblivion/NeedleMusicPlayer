@@ -27,7 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = App.class)
+@Config(sdk = 34, application = App.class)
 public class ResetPlayCountsTest {
 
     @Test
@@ -40,7 +40,8 @@ public class ResetPlayCountsTest {
                 broadcast.set(true);
             }
         };
-        context.registerReceiver(receiver, new IntentFilter(MusicService.STATISTICS_CHANGED));
+        context.registerReceiver(receiver, new IntentFilter(MusicService.STATISTICS_CHANGED),
+                Context.RECEIVER_NOT_EXPORTED);
         try {
             ResetPlayCountsHelper.reset(context, Song.EMPTY_SONG, Runnable::run);
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
@@ -62,7 +63,8 @@ public class ResetPlayCountsTest {
                 broadcast.set(true);
             }
         };
-        context.registerReceiver(receiver, new IntentFilter(MusicService.STATISTICS_CHANGED));
+        context.registerReceiver(receiver, new IntentFilter(MusicService.STATISTICS_CHANGED),
+                Context.RECEIVER_NOT_EXPORTED);
         try (SongPlayCountStore store = new SongPlayCountStore(context)) {
             store.recordPlay(42L, System.currentTimeMillis(), "one", 0L);
             assertEquals(1, topIds(store).size());

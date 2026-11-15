@@ -1,6 +1,5 @@
 package io.github.omblivion.needle.ui.activities.base;
 
-import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
@@ -29,6 +28,7 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
     private boolean hadPermissions;
     private String[] permissions;
     private String permissionDeniedMessage;
+    private Snackbar permissionSnackbar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,16 +53,22 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
     protected void onResume() {
         super.onResume();
         final boolean hasPermissions = hasPermissions();
+        if (hasPermissions) dismissPermissionMessage();
         if (hasPermissions != hadPermissions) {
             hadPermissions = hasPermissions;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                onHasPermissionsChanged(hasPermissions);
-            }
+            onHasPermissionsChanged(hasPermissions);
         }
     }
 
     protected void onHasPermissionsChanged(boolean hasPermissions) {
         // implemented by sub classes
+    }
+
+    private void dismissPermissionMessage() {
+        if (permissionSnackbar != null) {
+            permissionSnackbar.dismiss();
+            permissionSnackbar = null;
+        }
     }
 
     @Nullable
@@ -83,7 +89,7 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
     }
 
     protected void requestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && permissions != null) {
+        if (permissions != null) {
             requestPermissions(permissions, PERMISSION_REQUEST);
         }
     }
@@ -115,9 +121,11 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
                     final String message = getPermissionDeniedMessage();
                     try {
                         final View container = getSnackBarContainer();
+                        dismissPermissionMessage();
                         final Snackbar snackbar = Snackbar.make(container, message, BaseTransientBottomBar.LENGTH_INDEFINITE);
+                        permissionSnackbar = snackbar;
 
-                        if (ActivityCompat.shouldShowRequestPermissionRationale(this, permissions[i])) {
+                        if (i < permissions.length && ActivityCompat.shouldShowRequestPermissionRationale(this, permissions[i])) {
                             //User has denied from permission dialog
                             snackbar.setAction(R.string.action_grant, view -> requestPermissions())
                                     .setActionTextColor(ThemeStore.accentColor(this))
@@ -147,6 +155,7 @@ public abstract class AbsBaseActivity extends AbsThemeActivity {
                 }
             }
             hadPermissions = hasPermissions();
+            if (hadPermissions) dismissPermissionMessage();
             onHasPermissionsChanged(hadPermissions);
         }
     }
