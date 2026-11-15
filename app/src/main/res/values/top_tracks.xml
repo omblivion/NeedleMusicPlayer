@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pref_title_top_tracks_window">Most played period</string>
     <string name="top_window_all_time">All time</string>
     <string name="top_window_year">1 year</string>
     <string name="top_window_52_weeks">52 weeks</string>

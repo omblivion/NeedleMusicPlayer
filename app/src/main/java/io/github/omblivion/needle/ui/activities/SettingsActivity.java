@@ -50,6 +50,8 @@ import io.github.omblivion.needle.preferences.PreAmpPreferenceDialog;
 import io.github.omblivion.needle.preferences.SharedPreferencesImporter;
 import io.github.omblivion.needle.preferences.SmartPlaylistPreference;
 import io.github.omblivion.needle.preferences.SmartPlaylistPreferenceDialog;
+import io.github.omblivion.needle.preferences.TopTracksWindowPreference;
+import io.github.omblivion.needle.preferences.TopTracksWindowPreferenceDialog;
 import io.github.omblivion.needle.preferences.SongConfirmationPreference;
 import io.github.omblivion.needle.service.MusicService;
 import io.github.omblivion.needle.ui.activities.base.AbsBaseActivity;
@@ -224,6 +226,8 @@ public class SettingsActivity extends AbsBaseActivity implements ColorChooserDia
                 return PreAmpPreferenceDialog.newInstance();
             } else if (preference instanceof SmartPlaylistPreference) {
                 return SmartPlaylistPreferenceDialog.newInstance(preference.getKey());
+            } else if (preference instanceof TopTracksWindowPreference) {
+                return TopTracksWindowPreferenceDialog.newInstance();
             } else if (preference instanceof ExportSettingsPreference) {
                 return ExportSettingsPreferenceDialog.newInstance();
             } else if (preference instanceof SongConfirmationPreference) {

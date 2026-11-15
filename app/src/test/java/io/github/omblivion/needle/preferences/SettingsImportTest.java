@@ -125,6 +125,22 @@ public class SettingsImportTest {
         assertEquals(2, PreferenceUtil.getInstance().getLibraryCategoryInfos().size());
     }
 
+    @Test
+    public void invalidTopTracksWindowRejectsEntireBackup() throws Exception {
+        preferences.edit().clear().putInt(PreferenceUtil.PRIMARY_COLOR, 123).commit();
+        importJson("{\"file_format\":\"json\",\"version_code\":202,\"primary_color\":456,"
+                + "\"top_tracks_window\":\"3 parsecs\"}");
+        assertEquals(123, preferences.getInt(PreferenceUtil.PRIMARY_COLOR, 0));
+        assertFalse(preferences.contains(PreferenceUtil.TOP_TRACKS_WINDOW));
+    }
+
+    @Test
+    public void validTopTracksWindowIsImported() throws Exception {
+        importJson("{\"file_format\":\"json\",\"version_code\":202,"
+                + "\"top_tracks_window\":\"24h\"}");
+        assertEquals("24h", preferences.getString(PreferenceUtil.TOP_TRACKS_WINDOW, null));
+    }
+
     private void importJson(String json) throws Exception {
         File file = File.createTempFile("settings", ".json", RuntimeEnvironment.getApplication().getCacheDir());
         Files.write(file.toPath(), json.getBytes(StandardCharsets.UTF_8));

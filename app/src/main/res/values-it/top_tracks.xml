@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pref_title_top_tracks_window">Periodo più ascoltato</string>
     <string name="top_window_all_time">Tutto il periodo</string>
     <string name="top_window_year">1 anno</string>
     <string name="top_window_52_weeks">52 settimane</string>

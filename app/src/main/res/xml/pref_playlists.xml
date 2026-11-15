@@ -28,6 +28,11 @@
             android:summary="@string/pref_summary_maintain_top_tracks_playlist"
             android:title="@string/my_top_tracks" />
 
+        <io.github.omblivion.needle.preferences.TopTracksWindowPreference
+            app:iconSpaceReserved="false"
+            android:key="top_tracks_window"
+            android:title="@string/pref_title_top_tracks_window" />
+
         <com.kabouzeid.appthemehelper.common.prefs.supportv7.ATESwitchPreference
             app:iconSpaceReserved="false"
             android:defaultValue="false"

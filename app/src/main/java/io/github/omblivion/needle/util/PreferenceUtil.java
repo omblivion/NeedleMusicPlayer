@@ -23,6 +23,7 @@ import com.google.gson.reflect.TypeToken;
 import io.github.omblivion.needle.App;
 import io.github.omblivion.needle.R;
 import io.github.omblivion.needle.model.CategoryInfo;
+import io.github.omblivion.needle.model.TopTracksWindow;
 import io.github.omblivion.needle.ui.fragments.mainactivity.folders.FoldersFragment;
 import io.github.omblivion.needle.ui.fragments.player.NowPlayingScreen;
 
@@ -104,6 +105,10 @@ public final class PreferenceUtil {
     public static final String NOT_RECENTLY_PLAYED_CUTOFF_V2 = PrefKey.exportableKey("not_recently_played_interval_v2");
     public static final String MAINTAIN_TOP_TRACKS_PLAYLIST = PrefKey.exportableKey("maintain_top_tracks_playlist");
     public static final String MAINTAIN_SKIPPED_SONGS_PLAYLIST = PrefKey.exportableKey("maintain_skipped_songs_playlist");
+
+    /** Rolling window used by the most-played views; one of the TopTracksWindow tokens. */
+    public static final String TOP_TRACKS_WINDOW = PrefKey.exportableKey("top_tracks_window");
+    public static final String TOP_TRACKS_WINDOW_DEFAULT = "52w";
 
     private static final String LAST_SLEEP_TIMER_VALUE = PrefKey.exportableKey("last_sleep_timer_value");
     private static final String NEXT_SLEEP_TIMER_ELAPSED_REALTIME = PrefKey.nonExportableKey("next_sleep_timer_elapsed_real_time");
@@ -731,6 +736,18 @@ public final class PreferenceUtil {
 
     public boolean maintainTopTrackPlaylist() {
         return mPreferences.getBoolean(MAINTAIN_TOP_TRACKS_PLAYLIST, true);
+    }
+
+    public void setTopTracksWindow(@NonNull final TopTracksWindow window) {
+        mPreferences.edit()
+                .putString(TOP_TRACKS_WINDOW, window.preferenceValue)
+                .apply();
+    }
+
+    @NonNull
+    public TopTracksWindow getTopTracksWindow() {
+        return TopTracksWindow.fromPreference(
+                mPreferences.getString(TOP_TRACKS_WINDOW, TOP_TRACKS_WINDOW_DEFAULT));
     }
 
     public void setMaintainSkippedSongsPlaylist(final boolean value) {

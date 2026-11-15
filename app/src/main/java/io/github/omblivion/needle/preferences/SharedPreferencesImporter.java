@@ -16,6 +16,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import io.github.omblivion.needle.R;
+import io.github.omblivion.needle.model.TopTracksWindow;
 import io.github.omblivion.needle.util.OopsHandler;
 import io.github.omblivion.needle.util.PreferenceUtil;
 import io.github.omblivion.needle.util.SafeToast;
@@ -102,6 +103,10 @@ public class SharedPreferencesImporter extends AppCompatActivity {
                     if (key.equals(PreferenceUtil.LIBRARY_CATEGORIES)) {
                         PreferenceUtil.parseLibraryCategoryInfos(value.getAsString());
                     }
+                    if (key.equals(PreferenceUtil.TOP_TRACKS_WINDOW)
+                            && !TopTracksWindow.isValidPreference(value.getAsString())) {
+                        throw new IllegalArgumentException("Invalid top tracks window: " + key);
+                    }
                     validated.put(key, value.getAsString());
                 } else {
                     if (!value.isBoolean()) throw new IllegalArgumentException("Expected boolean: " + key);
@@ -138,6 +143,7 @@ public class SharedPreferencesImporter extends AppCompatActivity {
     private static final Set<String> STRING_KEYS = Set.of(
             PreferenceUtil.GENERAL_THEME, PreferenceUtil.AUTO_DOWNLOAD_IMAGES_POLICY,
             PreferenceUtil.LIBRARY_CATEGORIES, PreferenceUtil.THEME_STYLE, PreferenceUtil.RG_SOURCE_MODE_V2,
+            PreferenceUtil.TOP_TRACKS_WINDOW,
             "start_directory", "artist_sort_order", "album_sort_order", "song_sort_order", "file_sort_order",
             "last_added_sort_order", "not_recently_played_sort_order",
             "last_added_interval_v2", "recently_played_interval_v2", "not_recently_played_interval_v2");
