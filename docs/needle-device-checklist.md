@@ -23,6 +23,12 @@ Do not run destructive tests on the user's only copy of their music.
 - Test play/pause/seek/skip, repeat modes, shuffle, duplicate tracks and queue edits.
 - With gapless enabled, use an unreadable/corrupt next file. Current audio should
   continue; next-track handling must recover without an endless error loop.
+- Edit/reorder the queue immediately before a gapless transition, including
+  duplicate tracks and removal of the prepared next occurrence. Metadata must
+  still match the audio that actually starts; JVM index tests cannot establish
+  native-player callback ordering.
+- Remove the final queue item while playing and while paused; the old file must
+  not continue playing and no invalid current position should remain.
 - Test audio focus with calls/navigation, headset unplug, Bluetooth disconnect,
   lock screen, background playback, process termination and restoration.
 - Test Android Auto browsing and controls.
@@ -44,6 +50,9 @@ Do not run destructive tests on the user's only copy of their music.
 - Remove a large cover and verify the shorter replacement has no trailing bytes,
   still decodes fully and retains all unrelated metadata.
 - Verify failure before encoding/writing leaves the source unchanged.
+- Cancel every document/file picker and its access guide. No permission grant,
+  tag write, delete task or library mutation should occur, and tag saving must
+  remain available for retry.
 - Simulate no space/permission loss/termination during writing. The current
   replacement is **not atomic across external providers**; recovery must be
   assessed before claiming crash-safe editing.

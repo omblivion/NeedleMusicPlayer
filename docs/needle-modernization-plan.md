@@ -1,5 +1,10 @@
 # Needle: stability and independent identity
 
+This document records the first pass. The subsequent
+[stability pass 2](needle-stability-pass2-plan.md) resolves its eight remaining
+lint errors and extends the suite to 69 tests per variant. The remaining audit
+work is tracked in [the backlog](needle-audit-backlog.md).
+
 ## Approved scope
 
 Needle Music Player (short name Needle) is an independent fork, installable

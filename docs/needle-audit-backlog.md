@@ -4,22 +4,22 @@ This is a prioritized follow-up list, not a claim that every function in the
 repository has been audited or that every risk is reproducible on a device.
 The current patch prioritizes data integrity and independent Needle identity.
 
-## Existing lint errors
+## Lint findings resolved in stability pass 2
 
-The first full renamed build reported 8 errors and 340 warnings; the task still
-exits successfully because inherited Gradle configuration uses
-`lint.abortOnError false`. A successful lint task is **not** a clean lint report.
+The first full renamed build reported 8 errors and 340 warnings. Stability pass 2
+resolved the eight errors and enabled `lint.abortOnError true`; warnings remain
+visible. The original findings and their disposition are:
 
 - Six `NewApi` reports: `OpenDocumentTree` contracts in
   `ui/activities/tageditor/AbsTagEditorActivity.java` and
   `dialogs/helper/DeleteSongsDialogApi19.java`. Validate registration and launch
-  paths on API 19/20 versus API 21+. Keep minSdk 19 until compatibility is
-  explicitly decided; do not merely suppress the warnings.
+  contracts now register only on API 21+, with cancellation regression coverage.
+  Keep minSdk 19 until compatibility is explicitly decided. API 19 branches were
+  simulated on a Robolectric API 21 runtime; real API 19 device coverage is open.
 - Two `Range` reports: unchecked cursor column indexes in
-  `provider/SongPlayCountStore.java`. Establish the cursor/schema contract and
-  test absent-column/error behavior before changing access.
-- Classify warnings and introduce a reviewed baseline before making lint
-  blocking. Do not hide existing warnings by globally disabling checks.
+  `provider/SongPlayCountStore.java`. Required columns now fail explicitly using
+  `getColumnIndexOrThrow`; malformed-schema and real count/score tests were added.
+- Classify remaining warnings. Do not hide them by globally disabling checks.
 
 ## Lifecycle, concurrency and performance
 
@@ -31,8 +31,16 @@ exits successfully because inherited Gradle configuration uses
 - Review cache locking during tag extraction, DB writes, sorting, and UI updates.
 - Search normalizes and scans sorted library copies on each query. Measure query
   latency/cancellation before adding caching or an index.
-- Complete adversarial queue-state tests: empty queue, deleted current track,
-  duplicate tracks, shuffle toggles, restore and concurrent edits.
+- Empty queue, deleted-current restore, duplicate occurrences, shuffle undo,
+  insertion, batch removal and prepared-next index regressions now have coverage.
+  Concurrent edits at the media-player callback boundary still need stress and
+  lifecycle/device tests.
+- Add actual playback-handler coverage for final queue removal; current service
+  tests prove that clearing is requested, not that a native player has stopped.
+- Harden restored queue correspondence: reject mismatched track IDs across
+  otherwise valid index permutations.
+- Verify paused `MusicService.openQueue(..., startPlaying=false)` with shuffle:
+  it currently uses the pre-shuffle position when scheduling selection.
 
 ## Storage and external entry points
 
@@ -43,6 +51,9 @@ exits successfully because inherited Gradle configuration uses
   and sharing flows before narrowing it or claiming a security vulnerability.
 - Continue review of playlist import/export, deletion, SAF grants, incoming VIEW
   intents, media commands, and exported components.
+- Legacy API 19 SAF flows still warrant an end-to-end review: the chosen file URI
+  in the tag editor is not forwarded to the current MediaStore-based writer.
+  Cancellation fixes do not establish successful SD-card writes on API 19.
 
 ## Compatibility and releases
 

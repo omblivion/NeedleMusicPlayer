@@ -915,7 +915,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             boolean isPlaying = isPlaying(playingQueue.getPlayingQueue().get(position));
 
             int newPosition = playingQueue.remove(position);
-            if (newPosition != -1) {
+            if (playingQueue.size() == 0) {
+                setPosition(StaticPlayingQueue.INVALID_POSITION);
+            } else if (newPosition != -1) {
                 if (isPlaying) {playSongAt(newPosition, false);}
                 else {setPosition(newPosition);}
             }
@@ -926,7 +928,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     public void removeSongs(@NonNull List<Song> songs) {
         synchronized (this) {
             int newPosition = playingQueue.removeSongs(songs);
-            if (newPosition != -1) {
+            if (newPosition != -1 || playingQueue.size() == 0) {
                 setPosition(newPosition);
             }
         }
