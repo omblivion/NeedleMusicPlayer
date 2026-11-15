@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import io.github.omblivion.needle.model.TopTracksWindow;
+import io.github.omblivion.needle.util.OopsHandler;
 
 import java.time.ZoneId;
 
@@ -60,6 +61,13 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         super(context, DATABASE_NAME, null, VERSION);
         // Force the migration/import path to run before any read.
         getWritableDatabase();
+    }
+
+    @Override
+    public void onOpen(@NonNull SQLiteDatabase db) {
+        super.onOpen(db);
+        // Bound dated-event growth on every open (see the retention ruling).
+        pruneOldEvents(db, System.currentTimeMillis());
     }
 
     @Override
@@ -113,45 +121,96 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     /**
      * Copies the recoverable weekly buckets from the v3 archive into the v4
-     * legacy table. Cumulative totals are seeded so All time keeps every count.
+     * legacy table, one row per week so each bucket expires on its own weekly
+     * schedule. In v3, {@code weekN} holds the count for week
+     * {@code week_index - N}. Cumulative totals are seeded with the full sum so
+     * All time keeps every count.
+     *
+     * <p>The archive is best-effort: a missing or differently-shaped v3 table
+     * (for example a v1/v2 database that dropped it) must not break opening.
      */
     private void importLegacyWeeks(@NonNull SQLiteDatabase db) {
         db.beginTransaction();
         try {
-            StringBuilder sum = new StringBuilder("0");
-            for (int i = 0; i < LEGACY_WEEKS; i++) {
-                sum.append("+IFNULL(").append(weekColumn(i)).append(",0)");
+            if (!tableHasColumn(db, Columns.V3_TABLE, "week0")) {
+                db.setTransactionSuccessful();
+                return;
             }
-            // One row per song with any recoverable weekly count.
+            // One row per song, reading every weekly bucket and its index.
             try (Cursor cursor = db.rawQuery(
-                    "SELECT " + Columns.LEGACY_ID + ", " + Columns.LEGACY_WEEK_INDEX + ", " + sum
-                            + " AS total FROM " + Columns.V3_TABLE
-                            + " WHERE " + sum + " > 0", null)) {
+                    "SELECT " + Columns.LEGACY_ID + ", " + Columns.LEGACY_WEEK_INDEX
+                            + ", " + allWeeksSum() + " AS total FROM " + Columns.V3_TABLE,
+                    null)) {
                 while (cursor.moveToNext()) {
                     long songId = cursor.getLong(0);
                     int weekIndex = cursor.getInt(1);
-                    int total = cursor.getInt(2);
-                    recordLegacyBucket(db, songId, weekIndex, total);
+                    long total = cursor.getLong(2);
+                    if (total <= 0) {
+                        continue;
+                    }
+                    seedStats(db, songId, total);
+                    importSongWeeks(db, songId, weekIndex);
                 }
             }
             db.setTransactionSuccessful();
+        } catch (RuntimeException exception) {
+            // Best-effort archive: never let a malformed legacy table break open.
+            OopsHandler.collectStackTrace(exception);
         } finally {
             db.endTransaction();
         }
     }
 
-    private static void recordLegacyBucket(@NonNull SQLiteDatabase db, long songId, int weekIndex, int total) {
+    /** Reads each {@code weekN} column and stores one legacy bucket per non-zero week. */
+    private void importSongWeeks(@NonNull SQLiteDatabase db, long songId, int weekIndex) {
+        try (Cursor cursor = db.query(Columns.V3_TABLE, null, Columns.LEGACY_ID + "=?",
+                new String[] {String.valueOf(songId)}, null, null, null)) {
+            if (!cursor.moveToFirst()) {
+                return;
+            }
+            for (int i = 0; i < LEGACY_WEEKS; i++) {
+                int column = cursor.getColumnIndex(weekColumn(i));
+                if (column == -1) {
+                    continue;
+                }
+                int count = cursor.getInt(column);
+                if (count <= 0) {
+                    continue;
+                }
+                ContentValues legacy = new ContentValues(3);
+                legacy.put(Columns.ID, songId);
+                // weekN is the count for week (week_index - N).
+                legacy.put(Columns.WEEK_INDEX, weekIndex - i);
+                legacy.put(Columns.LEGACY_COUNT, count);
+                db.insertWithOnConflict(Columns.LEGACY_WEEKS, null, legacy, SQLiteDatabase.CONFLICT_IGNORE);
+            }
+        }
+    }
+
+    private static void seedStats(@NonNull SQLiteDatabase db, long songId, long total) {
         ContentValues stats = new ContentValues(3);
         stats.put(Columns.ID, songId);
         stats.put(Columns.TOTAL_COUNT, total);
         stats.put(Columns.RESET_VERSION, 0L);
         db.insertWithOnConflict(Columns.STATS, null, stats, SQLiteDatabase.CONFLICT_IGNORE);
+    }
 
-        ContentValues legacy = new ContentValues(3);
-        legacy.put(Columns.ID, songId);
-        legacy.put(Columns.WEEK_INDEX, weekIndex);
-        legacy.put(Columns.LEGACY_COUNT, total);
-        db.insertWithOnConflict(Columns.LEGACY_WEEKS, null, legacy, SQLiteDatabase.CONFLICT_IGNORE);
+    @NonNull
+    private static String allWeeksSum() {
+        StringBuilder sum = new StringBuilder("0");
+        for (int i = 0; i < LEGACY_WEEKS; i++) {
+            sum.append("+IFNULL(").append(weekColumn(i)).append(",0)");
+        }
+        return sum.toString();
+    }
+
+    private static boolean tableHasColumn(@NonNull SQLiteDatabase db, @NonNull String table,
+                                          @NonNull String column) {
+        try (Cursor cursor = db.rawQuery("SELECT * FROM " + table + " LIMIT 0", null)) {
+            return cursor.getColumnIndex(column) != -1;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     @NonNull
@@ -337,9 +396,15 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         getWritableDatabase();
     }
 
-    /** Test-only: applies the dated-event retention rule at an explicit instant. */
-    void pruneForTest(long nowMillis) {
-        final SQLiteDatabase database = getWritableDatabase();
+    /**
+     * Deletes dated events older than the retention horizon at {@code nowMillis}.
+     * All-time totals are untouched: they are kept indefinitely.
+     */
+    public void pruneOldEvents(long nowMillis) {
+        pruneOldEvents(getWritableDatabase(), nowMillis);
+    }
+
+    private static void pruneOldEvents(@NonNull SQLiteDatabase database, long nowMillis) {
         database.delete(Columns.EVENTS, Columns.OCCURRED_AT + " < ?",
                 new String[] {String.valueOf(nowMillis - EVENT_RETENTION_MS)});
     }

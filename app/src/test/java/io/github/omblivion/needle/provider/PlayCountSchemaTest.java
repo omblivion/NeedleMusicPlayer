@@ -28,45 +28,65 @@ public class PlayCountSchemaTest {
     private static final long NOW = 1_700_000_000_000L;
 
     @Test
-    public void legacyV3WeeklyCountsSurviveMigrationInAllTimeAndDefaultWindow() {
+    public void legacyWeeklyCountsSurviveMigrationInAllTimeAndDefaultWindow() {
         createV3Database();
-        seedLegacyV3Row(42L, /*week0=*/ 5, /*week_index=*/ currentEpochWeek() - 1);
+        // week0 = current week (5), week1 = one week earlier (2).
+        seedLegacyV3Row(42L, currentEpochWeek(), new int[][]{{0, 5}, {1, 2}});
 
         try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
-            assertEquals(5, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
-            assertEquals(5, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW));
+            assertEquals(7, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
+            assertEquals(7, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW));
         }
     }
 
     @Test
-    public void legacyWeeklyCountOutsideTheDefaultHorizonIsOnlyInAllTime() {
+    public void legacyBucketsExpireIndividuallyAsWeeksAdvance() {
         createV3Database();
-        seedLegacyV3Row(42L, /*week0=*/ 4, /*week_index=*/ currentEpochWeek() - 60);
+        // Bucket at week0 is current; bucket at week1 is one week older.
+        seedLegacyV3Row(42L, currentEpochWeek() - 51, new int[][]{{0, 4}, {1, 9}});
 
         try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
-            assertEquals(4, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
-            assertEquals(0, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW));
+            // Bucket (week_index - 1 = current - 52) is just outside the horizon;
+            // bucket (week_index = current - 51) is still inside it.
+            assertEquals(13, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
+            assertEquals(4, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW));
+
+            // One week later the older bucket is still outside and the newer one
+            // has aged out too: the whole song leaves the default window.
+            assertEquals(0, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW + ONE_WEEK));
+            assertEquals(13, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW + ONE_WEEK));
         }
     }
 
     @Test
     public void reopeningTheStoreDoesNotDoubleImportLegacyCounts() {
         createV3Database();
-        seedLegacyV3Row(42L, /*week0=*/ 3, /*week_index=*/ currentEpochWeek());
+        seedLegacyV3Row(42L, currentEpochWeek(), new int[][]{{0, 3}, {1, 4}});
 
         try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
-            assertEquals(3, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
+            assertEquals(7, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
             store.reopenForTest();
             store.reopenForTest();
 
-            assertEquals(3, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
+            assertEquals(7, totalCount(store, 42L, TopTracksWindow.ALL_TIME, NOW));
+        }
+    }
+
+    @Test
+    public void openingWithoutALegacyArchiveDoesNotCrash() {
+        // A database at version 3 with no v3 archive table (e.g. a v1/v2
+        // upgrade that dropped it) must still open: the import is best-effort.
+        withV3Database(db -> { /* no song_play_count table */ });
+
+        try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
+            assertEquals(0, topIds(store, 10, TopTracksWindow.ALL_TIME, NOW).size());
         }
     }
 
     @Test
     public void legacyArchiveTableIsPreservedReadOnlyAfterMigration() {
         createV3Database();
-        seedLegacyV3Row(42L, /*week0=*/ 5, /*week_index=*/ currentEpochWeek() - 1);
+        seedLegacyV3Row(42L, currentEpochWeek() - 1, new int[][]{{0, 5}});
 
         try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
             // The v3 archive is never dropped or rewritten by the v4 migration.
@@ -168,7 +188,7 @@ public class PlayCountSchemaTest {
     public void datedEventsOlderThanRetentionLeaveAllTimeTotalsIntact() {
         try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
             record(store, 42L, NOW - 500L * ONE_DAY, "ancient");
-            store.pruneForTest(NOW);
+            store.pruneOldEvents(NOW);
 
             // All-time totals are kept indefinitely; the aged-out play is still
             // counted there but is no longer exposed as a dated event.
@@ -176,6 +196,22 @@ public class PlayCountSchemaTest {
             // Every dated window only sees retained events.
             assertEquals(0, topIds(store, 10, TopTracksWindow.YEAR, NOW).size());
             assertEquals(0, totalCount(store, 42L, TopTracksWindow.WEEKS_52, NOW));
+        }
+    }
+
+    @Test
+    public void reopeningTheStorePrunesEventsBeyondRetention() {
+        try (SongPlayCountStore store = new SongPlayCountStore(RuntimeEnvironment.getApplication())) {
+            // 500 days before the real clock is beyond the 400-day retention.
+            long realNow = System.currentTimeMillis();
+            store.recordPlay(42L, realNow - 500L * ONE_DAY, "ancient", 0L);
+            assertEquals(1, playEventRows(store));
+
+            store.reopenForTest();
+
+            // The open path pruned the aged-out dated event; the total remains.
+            assertEquals(0, playEventRows(store));
+            assertEquals(1, totalCount(store, 42L, TopTracksWindow.ALL_TIME, realNow));
         }
     }
 
@@ -201,11 +237,21 @@ public class PlayCountSchemaTest {
         store.recordPlay(songId, timestamp, occurrence, resetVersion);
     }
 
-    private static void seedLegacyV3Row(long songId, int week0, int weekIndex) {
-        withV3Database(db -> db.execSQL(
-                "INSERT INTO song_play_count (song_id, week_index, week0, play_count_score) "
-                        + "VALUES (?, ?, ?, ?)",
-                new Object[] {songId, weekIndex, week0, 0}));
+    private static void seedLegacyV3Row(long songId, int weekIndex, int[][] weekCounts) {
+        withV3Database(db -> {
+            StringBuilder columns = new StringBuilder("song_id, week_index, play_count_score");
+            StringBuilder values = new StringBuilder("?, ?, 0");
+            java.util.List<Object> args = new java.util.ArrayList<>();
+            args.add(songId);
+            args.add(weekIndex);
+            for (int[] pair : weekCounts) {
+                columns.append(", week").append(pair[0]);
+                values.append(", ?");
+                args.add(pair[1]);
+            }
+            db.execSQL("INSERT INTO song_play_count (" + columns + ") VALUES (" + values + ")",
+                    args.toArray());
+        });
     }
 
     /** Creates a genuine v3 database file so the v4 migration path runs on open. */
@@ -233,6 +279,14 @@ public class PlayCountSchemaTest {
 
     private static int currentEpochWeek() {
         return (int) (NOW / ONE_WEEK);
+    }
+
+    private static long playEventRows(SongPlayCountStore store) {
+        try (Cursor cursor = store.getReadableDatabase().rawQuery(
+                "SELECT COUNT(*) FROM play_event", null)) {
+            cursor.moveToFirst();
+            return cursor.getLong(0);
+        }
     }
 
     private static long totalCount(SongPlayCountStore store, long songId, TopTracksWindow window, long now) {
