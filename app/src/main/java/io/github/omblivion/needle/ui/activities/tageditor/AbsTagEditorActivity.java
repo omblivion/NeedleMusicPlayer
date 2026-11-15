@@ -26,6 +26,7 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.widget.Toolbar;
 import androidx.viewbinding.ViewBinding;
 
@@ -142,30 +143,40 @@ public abstract class AbsTagEditorActivity extends AbsBaseActivity {
                                 .putExtra("android.content.extra.SHOW_ADVANCED", true);
                     }
                 },
-                resultUri -> writeTags(List.of(currentSong)));
+                resultUri -> {
+                    if (resultUri != null) writeTags(List.of(currentSong));
+                    else showFab();
+                });
 
         writeTagsApi21_SAFGuide = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    if (result.getResultCode() == Activity.RESULT_OK)
+                    if (result.getResultCode() == Activity.RESULT_OK && writeTagsApi21_SAFTreePicker != null)
                     {
                         writeTagsApi21_SAFTreePicker.launch(null);
-                    }
+                    } else showFab();
                 });
 
-        writeTagsApi21_SAFTreePicker = registerForActivityResult(
-                new ActivityResultContracts.OpenDocumentTree() {
-                    @NonNull
-                    @Override
-                    public Intent createIntent(@NonNull Context context, Uri input) {
-                        return super.createIntent(context, input)
-                                .putExtra("android.content.extra.SHOW_ADVANCED", true);
-                    }
-                },
-                resultUri -> {
-                    SAFUtil.saveTreeUri(this, resultUri);
-                    writeTags(savedSongs);
-                });
+        if (Build.VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP) {
+            writeTagsApi21_SAFTreePicker = registerForActivityResult(
+                    new ActivityResultContracts.OpenDocumentTree() {
+                        @RequiresApi(VERSION_CODES.LOLLIPOP)
+                        @NonNull
+                        @Override
+                        public Intent createIntent(@NonNull Context context, Uri input) {
+                            return super.createIntent(context, input)
+                                    .putExtra("android.content.extra.SHOW_ADVANCED", true);
+                        }
+                    },
+                    resultUri -> {
+                        if (resultUri == null) {
+                            showFab();
+                            return;
+                        }
+                        SAFUtil.saveTreeUri(this, resultUri);
+                        writeTags(savedSongs);
+                    });
+        }
 
         if (Build.VERSION.SDK_INT >= VERSION_CODES.R) {
             tagEditRequestApi30 = registerForActivityResult(

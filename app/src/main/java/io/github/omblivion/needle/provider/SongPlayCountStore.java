@@ -177,11 +177,11 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
      * @param bumpCount whether to bump the current's week play count by 1 and adjust the score
      */
     private void updateExistingRow(@NonNull final SQLiteDatabase database, @NonNull Cursor cursor, boolean bumpCount) {
-        final long id = cursor.getLong(cursor.getColumnIndex(SongPlayCountColumns.ID));
+        final long id = cursor.getLong(cursor.getColumnIndexOrThrow(SongPlayCountColumns.ID));
         final String stringId = String.valueOf(id);
 
         // figure how many weeks since we last updated
-        final int lastUpdatedWeek = cursor.getInt(cursor.getColumnIndex(SongPlayCountColumns.LAST_UPDATED_WEEK_INDEX));
+        final int lastUpdatedWeek = cursor.getInt(cursor.getColumnIndexOrThrow(SongPlayCountColumns.LAST_UPDATED_WEEK_INDEX));
         int weekDiff = mNumberOfWeeksSinceEpoch - lastUpdatedWeek;
 
         // if it's more than the number of weeks we track, delete it and create a new entry
@@ -242,7 +242,7 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
             ContentValues values = new ContentValues(2);
 
             // increase the score by a single score amount
-            int scoreIndex = cursor.getColumnIndex(SongPlayCountColumns.PLAY_COUNT_SCORE);
+            int scoreIndex = cursor.getColumnIndexOrThrow(SongPlayCountColumns.PLAY_COUNT_SCORE);
             float score = cursor.getFloat(scoreIndex) + getScoreMultiplierForWeek(0);
             values.put(SongPlayCountColumns.PLAY_COUNT_SCORE, score);
 

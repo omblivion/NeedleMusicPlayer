@@ -13,6 +13,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
@@ -68,27 +69,31 @@ public class DeleteSongsDialogApi19 extends DialogFragment {
         deleteSongs_SAFGuide = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    if (result.getResultCode() == Activity.RESULT_OK) {
+                    if (result.getResultCode() == Activity.RESULT_OK && deleteSongs_SAFTreePicker != null) {
                         deleteSongs_SAFTreePicker.launch(null);
                     }
                 });
 
-        deleteSongs_SAFTreePicker = registerForActivityResult(
-                new ActivityResultContracts.OpenDocumentTree() {
-                    @NonNull
-                    @Override
-                    public Intent createIntent(@NonNull Context context, Uri input) {
-                        return super.createIntent(context, input)
-                                .putExtra("android.content.extra.SHOW_ADVANCED", true);
-                    }
-                },
-                resultUri -> {
-                    if (deleteSongsTask != null) {
-                        deleteSongsTask.cancel(true);
-                    }
-                    deleteSongsTask = new AsyncTaskApi21(this);
-                    ((AsyncTaskApi21)deleteSongsTask).execute(resultUri);
-                });
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            deleteSongs_SAFTreePicker = registerForActivityResult(
+                    new ActivityResultContracts.OpenDocumentTree() {
+                        @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+                        @NonNull
+                        @Override
+                        public Intent createIntent(@NonNull Context context, Uri input) {
+                            return super.createIntent(context, input)
+                                    .putExtra("android.content.extra.SHOW_ADVANCED", true);
+                        }
+                    },
+                    resultUri -> {
+                        if (resultUri == null) return;
+                        if (deleteSongsTask != null) {
+                            deleteSongsTask.cancel(true);
+                        }
+                        deleteSongsTask = new AsyncTaskApi21(this);
+                        ((AsyncTaskApi21)deleteSongsTask).execute(resultUri);
+                    });
+        }
 
         deleteSongsApi19_SAFFilePicker = registerForActivityResult(
                 new ActivityResultContracts.CreateDocument("audio/*") {
@@ -101,6 +106,7 @@ public class DeleteSongsDialogApi19 extends DialogFragment {
                     }
                 },
                 resultUri -> {
+                    if (resultUri == null) return;
                     if (deleteSongsTask != null) {
                         deleteSongsTask.cancel(true);
                     }
