@@ -108,6 +108,10 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     public static final String FAVORITE_STATE_CHANGED = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".favoritestatechanged";
 
+    // Sent after a play count is recorded, so most-played consumers refresh
+    // without a synthetic playback metadata change.
+    public static final String STATISTICS_CHANGED = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".statisticschanged";
+
     public static final String REPEAT_MODE_CHANGED = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".repeatmodechanged";
     public static final String SHUFFLE_MODE_CHANGED = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".shufflemodechanged";
     public static final String MEDIA_STORE_CHANGED = NEEDLE_MUSIC_PLAYER_PACKAGE_NAME + ".mediastorechanged";
@@ -1202,15 +1206,13 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
                 final Song currentSong = getCurrentSong();
                 HistoryStore.getInstance(this).addSongId(currentSong.id);
-                if (PreferenceUtil.getInstance().maintainTopTrackPlaylist() && songPlayCountHelper.shouldBumpPlayCount()) {
-                    // TODO(task-3): capture the occurrence and reset version when tracking
-                    // begins and notify top-track consumers separately.
-                    long playedId = songPlayCountHelper.getSong().id;
+                if (PreferenceUtil.getInstance().maintainTopTrackPlaylist()) {
                     SongPlayCountStore store = SongPlayCountStore.getInstance(this);
-                    store.recordPlay(playedId, System.currentTimeMillis(),
-                            java.util.UUID.randomUUID().toString(), store.getResetVersion(playedId));
+                    if (songPlayCountHelper.commitIfQualified(store, songPlayCountHelper.getElapsedTime())) {
+                        sendChangeInternal(STATISTICS_CHANGED);
+                    }
                 }
-                songPlayCountHelper.notifySongChanged(currentSong);
+                songPlayCountHelper.notifySongChanged(currentSong, SongPlayCountStore.getInstance(this));
                 break;
             case QUEUE_CHANGED:
                 updateMediaSessionMetaData(); // because playing queue size might have changed

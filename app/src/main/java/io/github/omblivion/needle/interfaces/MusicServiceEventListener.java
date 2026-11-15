@@ -19,4 +19,8 @@ public interface MusicServiceEventListener {
     void onShuffleModeChanged();
 
     void onMediaStoreChanged();
+
+    /** Called when play statistics change; most-played views refresh here. */
+    default void onStatisticsChanged() {
+    }
 }

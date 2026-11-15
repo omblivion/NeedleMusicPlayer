@@ -95,6 +95,7 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
             filter.addAction(MusicService.QUEUE_CHANGED);
             filter.addAction(MusicService.MEDIA_STORE_CHANGED);
             filter.addAction(MusicService.FAVORITE_STATE_CHANGED);
+            filter.addAction(MusicService.STATISTICS_CHANGED);
 
             registerReceiver(musicStateReceiver, filter);
 
@@ -159,6 +160,15 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
     }
 
     @Override
+    public void onStatisticsChanged() {
+        for (MusicServiceEventListener listener : mMusicServiceEventListeners) {
+            if (listener != null) {
+                listener.onStatisticsChanged();
+            }
+        }
+    }
+
+    @Override
     public void onRepeatModeChanged() {
         for (MusicServiceEventListener listener : mMusicServiceEventListeners) {
             if (listener != null) {
@@ -208,6 +218,9 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
                         break;
                     case MusicService.MEDIA_STORE_CHANGED:
                         activity.onMediaStoreChanged();
+                        break;
+                    case MusicService.STATISTICS_CHANGED:
+                        activity.onStatisticsChanged();
                         break;
                 }
             }
