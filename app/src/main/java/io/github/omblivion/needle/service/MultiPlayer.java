@@ -93,6 +93,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             }
             player.prepare();
         } catch (Exception e) {
+            OopsHandler.collectStackTrace(e);
             return false;
         }
         player.setOnCompletionListener(this);
@@ -393,32 +394,52 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
                 } catch (IllegalArgumentException | IllegalStateException error) {
                     OopsHandler.collectStackTrace(error);
                 }
-                mNextMediaPlayer.release();
+                try {
+                    mNextMediaPlayer.release();
+                } catch (IllegalStateException error) {
+                    OopsHandler.collectStackTrace(error);
+                }
                 mNextMediaPlayer = null;
             }
             return true; // Do not dispatch onCompletion for the failed preload.
         }
-        if (mp == mCurrentMediaPlayer) {
-            if (context != null) {
-                SafeToast.show(context, context.getResources().getString(R.string.unplayable_file));
-            }
-            mIsInitialized = false;
-            mCurrentMediaPlayer.release();
-            if (mNextMediaPlayer != null) {
-                mCurrentMediaPlayer = mNextMediaPlayer;
-                mIsInitialized = true;
-                mNextMediaPlayer = null;
-                if (callbacks != null) {
-                    callbacks.onTrackWentToNext();
-                }
-            } else {
-                mCurrentMediaPlayer = new MediaPlayer();
-                mCurrentMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
-            }
-        }
-        return false;
-    }
+        // The current track could not be played (for example a corrupt or
+        // unreadable file). Release the broken player safely, discard any
+        // preload, and let the owner decide how to continue. Returning true
+        // suppresses the framework's onCompletion, which would otherwise run
+        // against the player we are releasing right now.
+        mIsInitialized = false;
 
+        if (mNextMediaPlayer != null) {
+            try {
+                mCurrentMediaPlayer.setNextMediaPlayer(null);
+            } catch (IllegalArgumentException | IllegalStateException error) {
+                OopsHandler.collectStackTrace(error);
+            }
+            try {
+                mNextMediaPlayer.release();
+            } catch (IllegalStateException error) {
+                OopsHandler.collectStackTrace(error);
+            }
+            mNextMediaPlayer = null;
+        }
+
+        try {
+            mCurrentMediaPlayer.release();
+        } catch (IllegalStateException error) {
+            OopsHandler.collectStackTrace(error);
+        }
+
+        if (context != null) {
+            mCurrentMediaPlayer = new MediaPlayer();
+            mCurrentMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
+        }
+
+        if (callbacks != null) {
+            callbacks.onTrackFailed();
+        }
+        return true;
+    }
     @Override
     public void onCompletion(final MediaPlayer mp) {
         if (mp == mCurrentMediaPlayer && mNextMediaPlayer != null) {

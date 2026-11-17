@@ -43,5 +43,12 @@ public interface Playback {
         void onTrackWentToNext();
 
         void onTrackEnded();
+
+        /**
+         * Invoked when the player could not play the current track (for example
+         * a corrupt or unreadable file). The owner is expected to skip the
+         * track and continue with the next playable one.
+         */
+        void onTrackFailed();
     }
 }

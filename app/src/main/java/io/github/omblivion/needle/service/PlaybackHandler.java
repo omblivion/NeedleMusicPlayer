@@ -82,6 +82,11 @@ final class PlaybackHandler extends Handler {
                 service.playSongAtImpl(msg.arg1);
                 break;
 
+            case MusicService.TRACK_FAILED:
+                if (checkPendingQuit(service)) {break;}
+                service.skipToNextPlayable(true);
+                break;
+
             case MusicService.SET_POSITION:
                 service.openTrackAndPrepareNextAt(msg.arg1);
                 service.notifyChange(MusicService.PLAY_STATE_CHANGED);

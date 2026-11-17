@@ -49,6 +49,8 @@
     <string name="songs">Songs</string>
     <string name="playlists">Playlists</string>
     <string name="unplayable_file">Couldn\u2019t play this song.</string>
+    <string name="unplayable_file_skipped">Couldn\u2019t play \u201c%1$s\u201d, skipping.</string>
+    <string name="too_many_unplayable_files">Too many songs couldn\u2019t be played. Stopping.</string>
     <string name="biography_unavailable">Couldn\u2019t find a biography entry for this artist.</string>
     <string name="wiki_unavailable">Couldn\u2019t find a wiki entry for this album.</string>
     <string name="biography">Biography</string>

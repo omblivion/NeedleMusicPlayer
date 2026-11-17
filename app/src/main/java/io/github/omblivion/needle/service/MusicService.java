@@ -38,6 +38,7 @@ import androidx.core.util.Predicate;
 import androidx.media.MediaBrowserServiceCompat;
 
 import io.github.omblivion.needle.R;
+import io.github.omblivion.needle.App;
 import io.github.omblivion.needle.appwidgets.AppWidgetBig;
 import io.github.omblivion.needle.appwidgets.AppWidgetCard;
 import io.github.omblivion.needle.appwidgets.AppWidgetClassic;
@@ -134,6 +135,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     static final int FOCUS_CHANGE = 6;
     static final int DUCK = 7;
     static final int UNDUCK = 8;
+    static final int TRACK_FAILED = 9;
 
     public static final int RANDOM_START_POSITION_ON_SHUFFLE = StaticPlayingQueue.INVALID_POSITION;
     public static final int SHUFFLE_MODE_NONE = StaticPlayingQueue.SHUFFLE_MODE_NONE;
@@ -144,6 +146,12 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     public static final int REPEAT_MODE_THIS = StaticPlayingQueue.REPEAT_MODE_THIS;
 
     private static final int SKIP_THRESHOLD_MS = 5000;
+
+    /** Maximum number of consecutive automatic skips before playback stops. */
+    public static final int MAX_CONSECUTIVE_SKIPS = 5;
+
+    /** Playback progress after which a track counts as really played. */
+    public static final int SKIP_RESET_PROGRESS_MS = 10000;
 
     @RequiresApi(Build.VERSION_CODES.O)
     static AudioAttributes PLAYBACK_ATTRIBUTE;
@@ -204,6 +212,22 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     private ContentObserver mediaStoreObserver;
     private boolean notHandledMetaChangedForCurrentTrack;
 
+    /** Tracks that failed to play in this session; never persisted. */
+    private final UnplayableTrackRegistry unplayableTracks = new UnplayableTrackRegistry();
+
+    /** Consecutive automatic skips; reset once a track really plays for a while. */
+    private int consecutiveSkipCount = 0;
+
+    /**
+     * Test seam: a plain {@code MusicService} instance has no base context, so
+     * anything touching resources would fail. Attach the application context.
+     */
+    void attachBaseContextForTest() {
+        if (getBaseContext() == null) {
+            attachBaseContext(App.getStaticContext());
+        }
+    }
+
     private final WeakMethodReference<MusicService> onDiscographyChanged = new WeakMethodReference<>(this, MusicService::onDiscographyChanged);
 
     private Handler uiThreadHandler;
@@ -213,6 +237,59 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     private static String getTrackUri(@NonNull Song song) {
         return MusicUtil.getSongFileUri(song.id).toString();
+    }
+
+    /** @return true when the track at {@code position} is known to be unplayable. */
+    boolean isTrackUnplayable(int position) {
+        return unplayableTracks.isUnplayable(getTrackUri(getSongAt(position)));
+    }
+
+    /** @return true when {@code uri} is known to be unplayable. */
+    boolean isTrackUriUnplayable(String uri) {
+        return unplayableTracks.isUnplayable(uri);
+    }
+
+    int getConsecutiveSkipCount() {
+        synchronized (this) {
+            return consecutiveSkipCount;
+        }
+    }
+
+    void setRepeatModeForTest(int mode) {
+        synchronized (this) {
+            playingQueue.setRepeatMode(mode);
+        }
+    }
+
+    void setPositionForTest(int position) {
+        synchronized (this) {
+            playingQueue.setCurrentPosition(position);
+        }
+    }
+
+    void markUriUnplayableForTest(String uri) {
+        unplayableTracks.markUnplayable(uri);
+    }
+
+    String trackUriAtForTest(int position) {
+        return getTrackUri(getSongAt(position));
+    }
+
+    /**
+     * Test seam: builds a queue whose tracks carry {@code trackUris} as their
+     * data, and makes it the current queue with {@code currentPosition}.
+     */
+    void openQueueForTest(String[] trackUris, int currentPosition) {
+        attachBaseContextForTest();
+        final ArrayList<Song> songs = new ArrayList<>(trackUris.length);
+        for (int i = 0; i < trackUris.length; i++) {
+            songs.add(new Song(i + 1, trackUris[i], i + 1, 0, 0L, trackUris[i], 0L, 0L,
+                    -1L, "", new ArrayList<>(0)));
+        }
+        synchronized (this) {
+            playingQueue = new StaticPlayingQueue();
+            playingQueue.openQueue(songs, currentPosition, SHUFFLE_MODE_NONE);
+        }
     }
 
     @Override
@@ -567,6 +644,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     boolean openTrackAndPrepareNextAt(int position) {
         synchronized (this) {
+            // Measure the outgoing track before switching: if it was heard for
+            // long enough, the run of skipped tracks is over.
+            resetConsecutiveSkipsIfPlayed();
             playingQueue.setCurrentPosition(position);
             boolean prepared = openCurrent();
             if (prepared) prepareNextImpl();
@@ -601,15 +681,55 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             try {
                 int nextPosition = playingQueue.getNextPosition(false);
                 if (getRepeatMode() == REPEAT_MODE_NONE && playingQueue.isLastTrack()) {
-                    playback.setNextDataSource(null);
+                    setNextDataSource(null, nextPosition);
                 } else {
-                    playback.setNextDataSource(getTrackUri(getSongAt(nextPosition)));
+                    // A track already known to be unplayable must not be
+                    // preloaded; walk forward to the next playable one so the
+                    // gapless transition stays silent.
+                    int candidate = nextPosition;
+                    while (isTrackUnplayable(candidate)) {
+                        final int advanced = nextPlayableCandidate(candidate);
+                        if (advanced == candidate) {
+                            // No further playable track: keep the original
+                            // choice rather than spinning.
+                            break;
+                        }
+                        candidate = advanced;
+                        if (candidate == nextPosition) {
+                            break;
+                        }
+                    }
+                    nextPosition = candidate;
+                    setNextDataSource(getTrackUri(getSongAt(nextPosition)), nextPosition);
                 }
                 playingQueue.setNextPosition(nextPosition);
             } catch (Exception e) {
                 OopsHandler.collectStackTrace(e);
             }
         }
+    }
+
+    /**
+     * Hands the next track to the player for gapless playback. Overridable so
+     * tests can observe the preload without a real media player.
+     */
+    void setNextDataSource(String uri, int position) {
+        playback.setNextDataSource(uri);
+    }
+
+    /**
+     * Returns the position after {@code from}, honoring repeat mode so the
+     * preload never walks past the end of a non-repeating queue.
+     */
+    private int nextPlayableCandidate(int from) {
+        final int size = playingQueue.size();
+        if (size <= 0) {
+            return from;
+        }
+        if (from + 1 < size) {
+            return from + 1;
+        }
+        return getRepeatMode() == REPEAT_MODE_NONE ? from : 0;
     }
 
     private void closeAudioEffectSession() {
@@ -755,12 +875,25 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         final SongCoverFetcher fetcher = new SongCoverFetcher(new SongCover(song));
         final InputStream data = fetcher.loadData();
         if (data != null) {
-            final Bitmap bitmap = BitmapFactory.decodeStream(data);
+            final Bitmap bitmap = decodeCoverArtSafely(data);
             metaData.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap);
         }
 
         mediaSession.setMetadata(metaData.build());
    }
+
+    /**
+     * Decodes cover art without letting a corrupt or unreadable image take the
+     * service down. A failed decode degrades to no artwork.
+     */
+    static Bitmap decodeCoverArtSafely(InputStream data) {
+        try {
+            return BitmapFactory.decodeStream(data);
+        } catch (Exception | OutOfMemoryError e) {
+            OopsHandler.collectStackTrace(e);
+            return null;
+        }
+    }
 
     public void runOnUiThread(Runnable runnable) {
         uiThreadHandler.post(runnable);
@@ -1003,7 +1136,74 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         if (openTrackAndPrepareNextAt(position)) {
             play();
         } else {
+            onTrackUnplayable();
+        }
+    }
+
+    /**
+     * Handles a track that could not be opened or played: records it as
+     * unplayable and advances the queue when it still makes sense to do so.
+     */
+    private void onTrackUnplayable() {
+        final Song song = getCurrentSong();
+        unplayableTracks.markUnplayable(getTrackUri(song));
+
+        if (song.id == Song.EMPTY_SONG.id) {
             SafeToast.show(this, getResources().getString(R.string.unplayable_file));
+        } else {
+            SafeToast.show(this, getResources().getString(
+                    R.string.unplayable_file_skipped, song.getTitle()));
+        }
+
+        skipToNextPlayable(true);
+    }
+
+    /**
+     * Advances to the next playable track, keeping within the consecutive
+     * failure cap and honoring the queue boundaries.
+     */
+    void skipToNextPlayable(boolean skippedLast) {
+        final int nextPosition;
+        synchronized (this) {
+            consecutiveSkipCount++;
+
+            // Repeating a single broken track, or the last track of a
+            // non-repeating queue, would either loop forever or wrap
+            // unexpectedly: stop cleanly instead.
+            if (getRepeatMode() == REPEAT_MODE_THIS
+                    || (getRepeatMode() == REPEAT_MODE_NONE && playingQueue.isLastTrack())) {
+                notifyChange(PLAY_STATE_CHANGED);
+                return;
+            }
+
+            if (consecutiveSkipCount >= MAX_CONSECUTIVE_SKIPS) {
+                stopAfterTooManyFailures();
+                return;
+            }
+
+            nextPosition = playingQueue.getNextPosition(skippedLast);
+        }
+
+        playSongAtImpl(nextPosition);
+    }
+
+    void stopAfterTooManyFailures() {
+        SafeToast.show(this, R.string.too_many_unplayable_files);
+        notifyChange(PLAY_STATE_CHANGED);
+    }
+
+    /**
+     * Clears the consecutive-skip counter once a track has actually been heard.
+     *
+     * <p>Called when a track starts or changes, never from the failure path:
+     * a failed track reports no progress, so measuring there would never
+     * reset anything and the cap would become a session-wide total.
+     */
+    void resetConsecutiveSkipsIfPlayed() {
+        synchronized (this) {
+            if (getSongProgressMillis() >= SKIP_RESET_PROGRESS_MS) {
+                consecutiveSkipCount = 0;
+            }
         }
     }
 
@@ -1295,6 +1495,31 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         synchronized (this) {
             if (playbackHandlerThread.isAlive()) {
                 playbackHandler.sendEmptyMessage(TRACK_ENDED);
+            }
+        }
+    }
+
+    @Override
+    public void onTrackFailed() {
+        final String uri;
+        synchronized (this) {
+            uri = getTrackUri(getCurrentSong());
+        }
+        unplayableTracks.markUnplayable(uri);
+        requestSkipOfUnplayableTrack();
+    }
+
+    /**
+     * Asks the playback handler to skip the failed track. Overridable so tests
+     * can observe the request without a live handler thread.
+     */
+    void requestSkipOfUnplayableTrack() {
+        synchronized (this) {
+            if (playbackHandlerThread != null && playbackHandlerThread.isAlive()) {
+                // One pending skip is enough: a second failure report for the
+                // same broken track must not advance twice.
+                playbackHandler.removeMessages(TRACK_FAILED);
+                playbackHandler.obtainMessage(TRACK_FAILED).sendToTarget();
             }
         }
     }
