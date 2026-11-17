@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## Needle [0.1.1] - 2026-11-17
 
 ### Fixes
 
 - Playback no longer stops on a corrupt or unreadable track: the track is skipped with a brief notice and the queue keeps playing, honoring repeat and shuffle. A wholly broken folder stops after five consecutive failures instead of spinning through the queue.
+- Corrupt or unreadable embedded cover art now degrades to no artwork instead of crashing the playback service.
 
 ## Needle [0.1.0] - 2026-11-15 - First stable release
 
