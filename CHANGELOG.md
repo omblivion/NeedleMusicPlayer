@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Playback no longer stops on a corrupt or unreadable track: the track is skipped with a brief notice and the queue keeps playing, honoring repeat and shuffle. A wholly broken folder stops after five consecutive failures instead of spinning through the queue.
+
 ## Needle [0.1.0] - 2026-11-15 - First stable release
 
 First stable Needle release. Needle is an independent local music player for

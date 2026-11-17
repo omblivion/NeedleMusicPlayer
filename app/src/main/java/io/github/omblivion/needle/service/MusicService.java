@@ -1501,8 +1501,16 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             uri = getTrackUri(getCurrentSong());
         }
         unplayableTracks.markUnplayable(uri);
+        requestSkipOfUnplayableTrack();
+    }
+
+    /**
+     * Asks the playback handler to skip the failed track. Overridable so tests
+     * can observe the request without a live handler thread.
+     */
+    void requestSkipOfUnplayableTrack() {
         synchronized (this) {
-            if (playbackHandlerThread.isAlive()) {
+            if (playbackHandlerThread != null && playbackHandlerThread.isAlive()) {
                 playbackHandler.obtainMessage(TRACK_FAILED).sendToTarget();
             }
         }

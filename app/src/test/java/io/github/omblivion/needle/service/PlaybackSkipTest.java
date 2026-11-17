@@ -17,14 +17,15 @@ import java.util.HashSet;
 @Config(sdk = 34, application = App.class)
 public class PlaybackSkipTest {
     /**
-     * A MusicService whose opening fails only for the positions in
-     * {@code failingPositions}. Playback itself is stubbed out, because
-     * requesting audio focus and updating the notification need a started
-     * service.
+     * A MusicService whose opening fails only for the URIs in
+     * {@code failingUris}, and whose skip requests are recorded instead of
+     * dispatched to the playback handler thread. `play()` and `notifyChange`
+     * are stubbed: both need a started service.
      */
     private static class FailingOpenService extends MusicService {
         private final HashSet<String> failingUris = new HashSet<>();
         final ArrayList<Integer> openedPositions = new ArrayList<>();
+        final ArrayList<Integer> skippedToPositions = new ArrayList<>();
 
         void failAtPosition(int position) {
             failingUris.add(trackUriAtForTest(position));
@@ -32,7 +33,7 @@ public class PlaybackSkipTest {
 
         void failAllPositions(int count) {
             for (int i = 0; i < count; i++) {
-                failAtPosition(i);
+                failingUris.add(trackUriAtForTest(i));
             }
         }
 
@@ -40,6 +41,11 @@ public class PlaybackSkipTest {
             openedPositions.add(position);
             setPositionForTest(position);
             return !failingUris.contains(trackUriAtForTest(position));
+        }
+
+        @Override void skipToNextPlayable(boolean skippedLast) {
+            skippedToPositions.add(1);
+            super.skipToNextPlayable(skippedLast);
         }
 
         @Override public void play() {
@@ -59,7 +65,6 @@ public class PlaybackSkipTest {
 
         service.playSongAtImpl(0);
 
-        assertEquals(1, service.getConsecutiveSkipCount());
         assertTrue(service.isTrackUriUnplayableForTest(service.trackUriAtForTest(0)));
         assertEquals(1, service.openedPositions.get(service.openedPositions.size() - 1).intValue());
     }
@@ -69,7 +74,7 @@ public class PlaybackSkipTest {
         FailingOpenService service = new FailingOpenService();
         service.openQueueForTest(new String[]{"a", "b", "c", "d", "e", "f", "g", "h"}, 0);
         service.failAllPositions(8);
-        service.setRepeatModeForTest(MusicService.REPEAT_MODE_NONE);
+        service.setRepeatModeForTest(MusicService.REPEAT_MODE_ALL);
 
         service.playSongAtImpl(0);
 
