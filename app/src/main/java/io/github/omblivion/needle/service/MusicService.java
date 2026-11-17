@@ -1115,6 +1115,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         final int nextPosition;
         synchronized (this) {
             resetConsecutiveSkipsIfPlayed();
+            consecutiveSkipCount++;
 
             // Repeating a single broken track, or the last track of a
             // non-repeating queue, would either loop forever or wrap
@@ -1125,7 +1126,6 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 return;
             }
 
-            consecutiveSkipCount++;
             if (consecutiveSkipCount >= MAX_CONSECUTIVE_SKIPS) {
                 stopAfterTooManyFailures();
                 return;
