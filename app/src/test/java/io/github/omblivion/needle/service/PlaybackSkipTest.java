@@ -65,7 +65,7 @@ public class PlaybackSkipTest {
 
         service.playSongAtImpl(0);
 
-        assertTrue(service.isTrackUriUnplayableForTest(service.trackUriAtForTest(0)));
+        assertTrue(service.isTrackUriUnplayable(service.trackUriAtForTest(0)));
         assertEquals(1, service.openedPositions.get(service.openedPositions.size() - 1).intValue());
     }
 

@@ -83,6 +83,7 @@ final class PlaybackHandler extends Handler {
                 break;
 
             case MusicService.TRACK_FAILED:
+                if (checkPendingQuit(service)) {break;}
                 service.skipToNextPlayable(true);
                 break;
 

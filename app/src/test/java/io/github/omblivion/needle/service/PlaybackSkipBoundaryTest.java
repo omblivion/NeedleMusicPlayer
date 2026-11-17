@@ -69,6 +69,6 @@ public class PlaybackSkipBoundaryTest {
         // Reopening the same broken track would loop forever.
         assertEquals(1, service.getConsecutiveSkipCount());
         assertEquals(1, service.openedPositions.size());
-        assertTrue(service.isTrackUriUnplayableForTest(service.trackUriAtForTest(0)));
+        assertTrue(service.isTrackUriUnplayable(service.trackUriAtForTest(0)));
     }
 }

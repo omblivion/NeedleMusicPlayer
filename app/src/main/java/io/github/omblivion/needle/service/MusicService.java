@@ -240,24 +240,19 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     /** @return true when the track at {@code position} is known to be unplayable. */
-    boolean shouldSkipTrackAt(int position) {
+    boolean isTrackUnplayable(int position) {
         return unplayableTracks.isUnplayable(getTrackUri(getSongAt(position)));
+    }
+
+    /** @return true when {@code uri} is known to be unplayable. */
+    boolean isTrackUriUnplayable(String uri) {
+        return unplayableTracks.isUnplayable(uri);
     }
 
     int getConsecutiveSkipCount() {
         synchronized (this) {
             return consecutiveSkipCount;
         }
-    }
-
-    void setConsecutiveSkipCount(int count) {
-        synchronized (this) {
-            consecutiveSkipCount = count;
-        }
-    }
-
-    boolean isTrackUriUnplayableForTest(String uri) {
-        return unplayableTracks.isUnplayable(uri);
     }
 
     void setRepeatModeForTest(int mode) {
@@ -649,6 +644,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     boolean openTrackAndPrepareNextAt(int position) {
         synchronized (this) {
+            // Measure the outgoing track before switching: if it was heard for
+            // long enough, the run of skipped tracks is over.
+            resetConsecutiveSkipsIfPlayed();
             playingQueue.setCurrentPosition(position);
             boolean prepared = openCurrent();
             if (prepared) prepareNextImpl();
@@ -683,20 +681,26 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             try {
                 int nextPosition = playingQueue.getNextPosition(false);
                 if (getRepeatMode() == REPEAT_MODE_NONE && playingQueue.isLastTrack()) {
-                    setNextDataSourceForTest(null, nextPosition);
+                    setNextDataSource(null, nextPosition);
                 } else {
                     // A track already known to be unplayable must not be
                     // preloaded; walk forward to the next playable one so the
                     // gapless transition stays silent.
                     int candidate = nextPosition;
-                    while (isTrackUriUnplayableForTest(getTrackUri(getSongAt(candidate)))) {
-                        candidate = nextPlayableCandidate(candidate);
+                    while (isTrackUnplayable(candidate)) {
+                        final int advanced = nextPlayableCandidate(candidate);
+                        if (advanced == candidate) {
+                            // No further playable track: keep the original
+                            // choice rather than spinning.
+                            break;
+                        }
+                        candidate = advanced;
                         if (candidate == nextPosition) {
                             break;
                         }
                     }
                     nextPosition = candidate;
-                    setNextDataSourceForTest(getTrackUri(getSongAt(nextPosition)), nextPosition);
+                    setNextDataSource(getTrackUri(getSongAt(nextPosition)), nextPosition);
                 }
                 playingQueue.setNextPosition(nextPosition);
             } catch (Exception e) {
@@ -706,10 +710,10 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     /**
-     * Preloads the next track on the player. Overridable so tests can observe
-     * the preload without a real media player.
+     * Hands the next track to the player for gapless playback. Overridable so
+     * tests can observe the preload without a real media player.
      */
-    void setNextDataSourceForTest(String uri, int position) {
+    void setNextDataSource(String uri, int position) {
         playback.setNextDataSource(uri);
     }
 
@@ -1161,7 +1165,6 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     void skipToNextPlayable(boolean skippedLast) {
         final int nextPosition;
         synchronized (this) {
-            resetConsecutiveSkipsIfPlayed();
             consecutiveSkipCount++;
 
             // Repeating a single broken track, or the last track of a
@@ -1190,9 +1193,11 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     /**
-     * Resets the consecutive-skip counter once the current track has really
-     * been heard, so a chain of tracks that open but die right away is still
-     * bounded by the cap.
+     * Clears the consecutive-skip counter once a track has actually been heard.
+     *
+     * <p>Called when a track starts or changes, never from the failure path:
+     * a failed track reports no progress, so measuring there would never
+     * reset anything and the cap would become a session-wide total.
      */
     void resetConsecutiveSkipsIfPlayed() {
         synchronized (this) {
@@ -1511,6 +1516,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     void requestSkipOfUnplayableTrack() {
         synchronized (this) {
             if (playbackHandlerThread != null && playbackHandlerThread.isAlive()) {
+                // One pending skip is enough: a second failure report for the
+                // same broken track must not advance twice.
+                playbackHandler.removeMessages(TRACK_FAILED);
                 playbackHandler.obtainMessage(TRACK_FAILED).sendToTarget();
             }
         }

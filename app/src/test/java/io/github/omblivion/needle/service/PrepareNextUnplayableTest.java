@@ -31,7 +31,7 @@ public class PrepareNextUnplayableTest {
         @Override void notifyChange(String what) {
         }
 
-        @Override void setNextDataSourceForTest(String uri, int position) {
+        @Override void setNextDataSource(String uri, int position) {
             preloadedUri = uri;
             preloadedPosition = position;
         }

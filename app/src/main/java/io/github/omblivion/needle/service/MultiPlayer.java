@@ -440,7 +440,6 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
         }
         return true;
     }
-
     @Override
     public void onCompletion(final MediaPlayer mp) {
         if (mp == mCurrentMediaPlayer && mNextMediaPlayer != null) {

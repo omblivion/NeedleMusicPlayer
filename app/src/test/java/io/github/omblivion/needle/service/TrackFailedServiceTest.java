@@ -32,7 +32,7 @@ public class TrackFailedServiceTest {
 
         service.onTrackFailed();
 
-        assertTrue(service.isTrackUriUnplayableForTest(service.trackUriAtForTest(0)));
+        assertTrue(service.isTrackUriUnplayable(service.trackUriAtForTest(0)));
         assertEquals(1, service.skipRequests);
     }
 }
