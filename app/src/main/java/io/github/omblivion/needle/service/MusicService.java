@@ -871,12 +871,25 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         final SongCoverFetcher fetcher = new SongCoverFetcher(new SongCover(song));
         final InputStream data = fetcher.loadData();
         if (data != null) {
-            final Bitmap bitmap = BitmapFactory.decodeStream(data);
+            final Bitmap bitmap = decodeCoverArtSafely(data);
             metaData.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap);
         }
 
         mediaSession.setMetadata(metaData.build());
    }
+
+    /**
+     * Decodes cover art without letting a corrupt or unreadable image take the
+     * service down. A failed decode degrades to no artwork.
+     */
+    static Bitmap decodeCoverArtSafely(InputStream data) {
+        try {
+            return BitmapFactory.decodeStream(data);
+        } catch (Exception | OutOfMemoryError e) {
+            OopsHandler.collectStackTrace(e);
+            return null;
+        }
+    }
 
     public void runOnUiThread(Runnable runnable) {
         uiThreadHandler.post(runnable);
