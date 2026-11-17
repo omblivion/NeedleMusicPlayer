@@ -683,15 +683,49 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             try {
                 int nextPosition = playingQueue.getNextPosition(false);
                 if (getRepeatMode() == REPEAT_MODE_NONE && playingQueue.isLastTrack()) {
-                    playback.setNextDataSource(null);
+                    setNextDataSourceForTest(null, nextPosition);
                 } else {
-                    playback.setNextDataSource(getTrackUri(getSongAt(nextPosition)));
+                    // A track already known to be unplayable must not be
+                    // preloaded; walk forward to the next playable one so the
+                    // gapless transition stays silent.
+                    int candidate = nextPosition;
+                    while (isTrackUriUnplayableForTest(getTrackUri(getSongAt(candidate)))) {
+                        candidate = nextPlayableCandidate(candidate);
+                        if (candidate == nextPosition) {
+                            break;
+                        }
+                    }
+                    nextPosition = candidate;
+                    setNextDataSourceForTest(getTrackUri(getSongAt(nextPosition)), nextPosition);
                 }
                 playingQueue.setNextPosition(nextPosition);
             } catch (Exception e) {
                 OopsHandler.collectStackTrace(e);
             }
         }
+    }
+
+    /**
+     * Preloads the next track on the player. Overridable so tests can observe
+     * the preload without a real media player.
+     */
+    void setNextDataSourceForTest(String uri, int position) {
+        playback.setNextDataSource(uri);
+    }
+
+    /**
+     * Returns the position after {@code from}, honoring repeat mode so the
+     * preload never walks past the end of a non-repeating queue.
+     */
+    private int nextPlayableCandidate(int from) {
+        final int size = playingQueue.size();
+        if (size <= 0) {
+            return from;
+        }
+        if (from + 1 < size) {
+            return from + 1;
+        }
+        return getRepeatMode() == REPEAT_MODE_NONE ? from : 0;
     }
 
     private void closeAudioEffectSession() {
