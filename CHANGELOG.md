@@ -1,13 +1,16 @@
 # Changelog
 
-## Unreleased
+## Needle [0.3.0] - 2026-11-25
 
-### Library reliability
+### Features
 
 - Discover music recursively on application open/resume and coordinate file indexing before importing changes. Explicit rescanning rebuilds derived catalog metadata without resetting surviving tracks' playlists, favorites, or listening statistics.
+- Anchor every playlist, favorite, history, and statistics reference to the track's canonical path. A provider ID may change on any rescan, so a reference is resolved by path: an ID swap relocates each reference to its own track, and a recycled ID can never claim another track's data.
+
+### Fixes
+
 - Publish catalog replacements transactionally instead of exposing partially imported libraries.
 - Preserve references across verified file updates and provider-ID changes; defer ambiguous identity matches instead of guessing from titles.
-- Anchor every playlist, favorite, history, and statistics reference to the track's canonical path. A provider ID may change on any rescan, so a reference is resolved by path: an ID swap relocates each reference to its own track, and a recycled ID can never claim another track's data.
 - Retain a reference whose path is temporarily absent instead of deleting it; it resolves again when the path returns. Renames with no continuity evidence are left pending rather than matched by similarity.
 - Confirm externally removed tracks with two complete observations before cleaning app-owned references. Temporary permission/storage failures and incomplete scans do not authorize cleanup.
 - Verify playback sources before opening them and keep displayed metadata bound to the opened audio snapshot during replacements and gapless transitions.
