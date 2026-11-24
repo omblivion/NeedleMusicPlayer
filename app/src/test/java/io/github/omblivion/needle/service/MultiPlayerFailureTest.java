@@ -27,7 +27,7 @@ public class MultiPlayerFailureTest {
         int wentToNextCount;
         int endedCount;
 
-        @Override public void onTrackWentToNext() { wentToNextCount++; }
+        @Override public void onTrackWentToNext(long sourceToken) { wentToNextCount++; }
         @Override public void onTrackEnded() { endedCount++; }
         @Override public void onTrackFailed() { failedCount++; }
     }

@@ -28,7 +28,7 @@ import java.util.Map;
  */
 abstract class SongList {
     @NonNull public String name;
-    final List<Long> songIds = new ArrayList<>();
+    final List<io.github.omblivion.needle.provider.ReferenceKey> entries = new ArrayList<>();
 
     SongList(@NonNull String name) {
         this.name = name;
@@ -42,30 +42,54 @@ abstract class SongList {
     public String getName() {return name;}
 
     public boolean contains(long songId) {
-        return songIds.contains(songId);
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            load();
+            for (io.github.omblivion.needle.provider.ReferenceKey entry : entries) {
+                if (entry.id() == songId) return true;
+            }
+            return false;
+        });
+    }
+
+    /** Resolves a source-bearing song to the key it should be stored under. */
+    static List<io.github.omblivion.needle.provider.ReferenceKey> resolveKeys(@NonNull List<Song> songs) {
+        List<io.github.omblivion.needle.provider.ReferenceKey> keys = new ArrayList<>();
+        for (Song song : songs) {
+            if (song.id == Song.EMPTY_SONG.id) continue;
+            // The path is the identity, so store it alongside the current ID.
+            keys.add(new io.github.omblivion.needle.provider.ReferenceKey(song.id, song.data));
+        }
+        return keys;
     }
 
     @NonNull
     public List<? extends Song> asSongs() {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(this::readSongs);
+    }
+
+    private List<? extends Song> readSongs() {
+        load();
         ArrayList<Song> result = new ArrayList<>();
         ArrayList<Long> orphanIds = new ArrayList<>();
 
         // Since the song list is decoupled from Discography, we need to check its content
-        // against the valid songs in discog
+        // against the valid songs in discog. Resolution is by path only: a numeric
+        // ID is never used, so a recycled provider ID cannot claim another track's
+        // reference. An entry whose path is temporarily absent is simply not shown.
         final Map<Long, Song> availableSongsById = Discography.getInstance().getAllSongsById();
-        for (final Long id : songIds) {
-            final Song matchingSong = availableSongsById.get(id);
+        final Map<String, Song> availableByPath = new java.util.HashMap<>();
+        for (Song song : availableSongsById.values()) {
+            availableByPath.put(io.github.omblivion.needle.model.SongSource.canonicalPath(song.data), song);
+        }
+        for (final io.github.omblivion.needle.provider.ReferenceKey entry : entries) {
+            if (entry.path().isEmpty()) continue;
+            Song matchingSong = availableByPath.get(
+                    io.github.omblivion.needle.model.SongSource.canonicalPath(entry.path()));
             if (matchingSong != null) {
                 result.add(matchingSong);
-            } else {
-                orphanIds.add(id);
             }
         }
 
-        if (!orphanIds.isEmpty()) {
-            songIds.removeAll(orphanIds);
-            save(null);
-        }
         return result;
     }
 }
@@ -76,40 +100,56 @@ abstract class MutableSongList extends SongList {
     }
 
     public void addSongs(@NonNull List<Song> songs) {
-        for (Song song : songs) {
-            songIds.add(song.id);
-        }
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+        load();
+        entries.addAll(resolveKeys(songs));
         save(null);
+        return null;
+        });
     }
 
     public void removeSong(long id) {
-        songIds.remove(id);
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+        load();
+        entries.removeIf(entry -> entry.id() == id);
         save(null);
+        return null;
+        });
     }
 
     public void removeSongsAtPosition(@NonNull final List<Integer> positions) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+        load();
         final List<Integer> reversedPositions = new ArrayList<>(positions);
         reversedPositions.sort(Comparator.reverseOrder());
         for (final int position : reversedPositions) {
-            if (position >= 0 && position < songIds.size()) {
-                songIds.remove(position);
+            if (position >= 0 && position < entries.size()) {
+                entries.remove(position);
             }
         }
         save(null);
+        return null;
+        });
     }
 
     public boolean moveSong(int fromPosition, int toPosition) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
+                moveSongInternal(fromPosition, toPosition));
+    }
+
+    private boolean moveSongInternal(int fromPosition, int toPosition) {
+        load();
         if (fromPosition == toPosition) {return true;}
 
-        final int size = songIds.size();
+        final int size = entries.size();
         if (fromPosition < 0 || fromPosition >= size) {return false;}
         if (toPosition < 0 || toPosition >= size) {return false;}
 
-        final long movedSongId = songIds.get(fromPosition);
-        songIds.remove(fromPosition);
+        final io.github.omblivion.needle.provider.ReferenceKey movedSong = entries.get(fromPosition);
+        entries.remove(fromPosition);
 
         final int toPositionShift = fromPosition < toPosition ? -1 : 0;
-        songIds.add(toPosition + toPositionShift, movedSongId);
+        entries.add(toPosition + toPositionShift, movedSong);
 
         save(null);
 
@@ -117,13 +157,17 @@ abstract class MutableSongList extends SongList {
     }
 
     public void rename(@NonNull final String newName) {
-        save(newName);
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            load();
+            save(newName);
+            return null;
+        });
     }
 }
 
 public class PreferencesBackedSongList extends MutableSongList {
     private static final String SEPARATOR = ",";
-    private static final String PREF_NAME_PREFIX = PrefKey.nonExportablePrefixedKey("SONG_IDS_");
+    static final String PREF_NAME_PREFIX = PrefKey.nonExportablePrefixedKey("SONG_IDS_");
 
     private static SharedPreferences preferences = null;
     static SharedPreferences getPreferences() {
@@ -133,8 +177,27 @@ public class PreferencesBackedSongList extends MutableSongList {
         return preferences;
     }
 
-    static List<PreferencesBackedSongList> loadAll() {
-        ArrayList<PreferencesBackedSongList> result = new ArrayList<>();
+    /** Every reference key stored across all app-owned song lists. */
+    static java.util.Set<io.github.omblivion.needle.provider.ReferenceKey> allStoredKeys() {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            java.util.Set<io.github.omblivion.needle.provider.ReferenceKey> keys = new java.util.HashSet<>();
+            final SharedPreferences preferences = getPreferences();
+            for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+                if (!entry.getKey().startsWith(PREF_NAME_PREFIX)) continue;
+                for (String token : ((String) entry.getValue()).split(SEPARATOR)) {
+                    if (token.isEmpty()) continue;
+                    try {
+                        keys.add(io.github.omblivion.needle.provider.ReferenceKey.parse(token));
+                    } catch (IllegalArgumentException ignored) {
+                        // A malformed entry cannot be resolved; leave it in place.
+                    }
+                }
+            }
+            return keys;
+        });
+    }
+
+    static List<PreferencesBackedSongList> loadAll() {        ArrayList<PreferencesBackedSongList> result = new ArrayList<>();
 
         String favoritesPlaylistName = App.getStaticContext().getString(R.string.favorites);
         PreferencesBackedSongList favoritesPlaylist = null;
@@ -160,8 +223,10 @@ public class PreferencesBackedSongList extends MutableSongList {
     }
 
     static void remove(@NonNull String name) {
-        final SharedPreferences preferences = getPreferences();
-        preferences.edit().remove(PREF_NAME_PREFIX + name).apply();
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            getPreferences().edit().remove(PREF_NAME_PREFIX + name).commit();
+            return null;
+        });
     }
 
     PreferencesBackedSongList(@NonNull String name) {
@@ -170,22 +235,29 @@ public class PreferencesBackedSongList extends MutableSongList {
 
     @Override
     void load() {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
         final SharedPreferences preferences = getPreferences();
         String values = preferences.getString(PREF_NAME_PREFIX + name, "");
 
-        songIds.clear();
-        try {
-            for (String id : values.split(SEPARATOR)) {songIds.add(Long.valueOf(id));}
-        } catch (NumberFormatException ignored) {
+        entries.clear();
+        for (String token : values.split(SEPARATOR)) {
+            if (token.isEmpty()) continue;
+            try {
+                entries.add(io.github.omblivion.needle.provider.ReferenceKey.parse(token));
+            } catch (IllegalArgumentException ignored) {
+                // A malformed entry is skipped rather than losing the whole list.
+            }
         }
+        return null;
+        });
     }
 
     @Override
     void save(@Nullable String newName) {
         StringBuilder values = new StringBuilder();
-        for (Long id : songIds) {
+        for (io.github.omblivion.needle.provider.ReferenceKey entry : entries) {
             if (values.length() > 0) {values.append(SEPARATOR);}
-            values.append(id);
+            values.append(entry.serialize());
         }
 
         final SharedPreferences preferences = getPreferences();

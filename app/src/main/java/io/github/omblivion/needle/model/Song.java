@@ -37,6 +37,14 @@ public class Song implements Parcelable {
     public final String data;
     public final long dateAdded;
     public final long dateModified;
+    @NonNull
+    public String contentUri = "";
+    public long sourceSize = -1;
+    public long sourceGeneration = -1;
+    public long sourceAddedGeneration = -1;
+    @NonNull
+    public String providerVersion = "";
+    public boolean metadataRetryNeeded = true;
     public int discNumber = 0;
     public final long duration;
     @NonNull
@@ -54,7 +62,7 @@ public class Song implements Parcelable {
         this.id = id;
         this.albumName = albumName;
         this.albumId = albumId;
-        this.artistNames = artistNames; // TODO To avoid aliasing, may want to make a copy of this list instead
+        this.artistNames = new ArrayList<>(artistNames);
         this.data = data;
         this.dateAdded = dateAdded;
         this.dateModified = dateModified;
@@ -67,17 +75,27 @@ public class Song implements Parcelable {
     }
 
     public Song(@NonNull final Song song) {
-        id = song.id;
-        albumArtistNames = song.albumArtistNames;
+        this(song, song.id);
+    }
+
+    public Song(@NonNull final Song song, long id) {
+        this.id = id;
+        albumArtistNames = new ArrayList<>(song.albumArtistNames);
         albumName = song.albumName;
         albumId = song.albumId;
-        artistNames = song.artistNames;
+        artistNames = new ArrayList<>(song.artistNames);
         data = song.data;
         dateAdded = song.dateAdded;
         dateModified = song.dateModified;
+        contentUri = song.contentUri;
+        sourceSize = song.sourceSize;
+        sourceGeneration = song.sourceGeneration;
+        sourceAddedGeneration = song.sourceAddedGeneration;
+        providerVersion = song.providerVersion;
+        metadataRetryNeeded = song.metadataRetryNeeded;
         discNumber = song.discNumber;
         duration = song.duration;
-        genres = song.genres;
+        genres = new ArrayList<>(song.genres);
         replayGainAlbum = song.replayGainAlbum;
         replayGainTrack = song.replayGainTrack;
         replayGainPeakAlbum = song.replayGainPeakAlbum;
@@ -118,6 +136,12 @@ public class Song implements Parcelable {
         if (albumId != song.albumId) return false;
         if (dateAdded != song.dateAdded) return false;
         if (dateModified != song.dateModified) return false;
+        if (sourceSize != song.sourceSize) return false;
+        if (sourceGeneration != song.sourceGeneration) return false;
+        if (sourceAddedGeneration != song.sourceAddedGeneration) return false;
+        if (metadataRetryNeeded != song.metadataRetryNeeded) return false;
+        if (!contentUri.equals(song.contentUri)) return false;
+        if (!providerVersion.equals(song.providerVersion)) return false;
         if (discNumber != song.discNumber) return false;
         if (duration != song.duration) return false;
         if (trackNumber != song.trackNumber) return false;
@@ -155,6 +179,8 @@ public class Song implements Parcelable {
         result = 31 * result + (title != null ? title.hashCode() : 0);
         result = 31 * result + trackNumber;
         result = 31 * result + year;
+        result = 31 * result + Objects.hash(contentUri, sourceSize, sourceGeneration, sourceAddedGeneration,
+                providerVersion, metadataRetryNeeded);
 
         return result;
     }
@@ -202,6 +228,12 @@ public class Song implements Parcelable {
         parcel.writeString(title);
         parcel.writeInt(trackNumber);
         parcel.writeInt(year);
+        parcel.writeString(contentUri);
+        parcel.writeLong(sourceSize);
+        parcel.writeLong(sourceGeneration);
+        parcel.writeString(providerVersion);
+        parcel.writeInt(metadataRetryNeeded ? 1 : 0);
+        parcel.writeLong(sourceAddedGeneration);
     }
 
     Song(@NonNull final Parcel in) {
@@ -221,6 +253,12 @@ public class Song implements Parcelable {
         title = nonNullify.apply(in.readString());
         trackNumber = in.readInt();
         year = in.readInt();
+        contentUri = nonNullify.apply(in.readString());
+        sourceSize = in.readLong();
+        sourceGeneration = in.readLong();
+        providerVersion = nonNullify.apply(in.readString());
+        metadataRetryNeeded = in.readInt() != 0;
+        sourceAddedGeneration = in.readLong();
     }
 
     public static final Creator<Song> CREATOR = new Creator<>() {

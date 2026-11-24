@@ -58,7 +58,7 @@ final class PlaybackHandler extends Handler {
                 break;
 
             case MusicService.TRACK_WENT_TO_NEXT:
-                service.setPositionToNextPosition();
+                service.promotePreparedSource((MusicService.PreparedSource) msg.obj);
                 service.prepareNextImpl();
                 service.notifyChange(MusicService.META_CHANGED);
                 break;

@@ -11,6 +11,10 @@ public interface Playback {
 
     void setNextDataSource(@Nullable String path);
 
+    default void setNextDataSource(@Nullable String path, long sourceToken) {
+        setNextDataSource(path);
+    }
+
     void setCallbacks(PlaybackCallbacks callbacks);
 
     boolean isInitialized();
@@ -40,7 +44,7 @@ public interface Playback {
     void setDuckingFactor(float duckingFactor);
 
     interface PlaybackCallbacks {
-        void onTrackWentToNext();
+        void onTrackWentToNext(long sourceToken);
 
         void onTrackEnded();
 

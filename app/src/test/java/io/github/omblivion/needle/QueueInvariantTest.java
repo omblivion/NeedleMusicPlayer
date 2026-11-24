@@ -76,6 +76,7 @@ public class QueueInvariantTest {
         ArrayList<IndexedSong> saved = saved(song(1), song(2), Song.EMPTY_SONG);
         StaticPlayingQueue queue = new StaticPlayingQueue(saved, saved(song(1), song(2), Song.EMPTY_SONG),
                 2, 0, 0);
+        queue.dropUnresolvedEntries();
         assertEquals(2, queue.size());
         assertEquals(1, queue.getCurrentPosition());
         assertConsistent(queue);
@@ -84,6 +85,7 @@ public class QueueInvariantTest {
     @Test public void restoredAllMissingTracksLeavesNoSelection() {
         StaticPlayingQueue queue = new StaticPlayingQueue(saved(Song.EMPTY_SONG, Song.EMPTY_SONG),
                 saved(Song.EMPTY_SONG, Song.EMPTY_SONG), 1, 0, 0);
+        queue.dropUnresolvedEntries();
         assertEquals(0, queue.size());
         assertEquals(-1, queue.getCurrentPosition());
     }

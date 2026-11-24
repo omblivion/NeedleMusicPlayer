@@ -66,12 +66,16 @@ class SongPlayCountHelper {
      */
     boolean commitIfQualified(@NonNull SongPlayCountStore store, long elapsedMs) {
         synchronized (this) {
+            return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
             if (committed || occurrence == null || !shouldBumpPlayCount(elapsedMs)) {
                 return false;
             }
             committed = true;
-            store.recordPlay(song.id, System.currentTimeMillis(), occurrence, resetVersion);
+            Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
+            if (logical.id == Song.EMPTY_SONG.id) return false;
+            store.recordPlay(logical.id, System.currentTimeMillis(), occurrence, resetVersion);
             return true;
+            });
         }
     }
 }

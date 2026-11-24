@@ -243,7 +243,22 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     private BrowsableMusicProvider mBrowsableMusicProvider;
 
     private static String getTrackUri(@NonNull Song song) {
-        return MusicUtil.getSongFileUri(song.id).toString();
+        return song.contentUri.isEmpty() ? MusicUtil.getSongFileUri(song.id).toString()
+                : song.contentUri;
+    }
+
+    private Song openedSong;
+    private io.github.omblivion.needle.model.SongSource openedSource;
+    private long nextSourceToken;
+    private final java.util.Map<Long, PreparedSource> preparedSources = new java.util.HashMap<>();
+
+    static final class PreparedSource {
+        final Song song;
+        final int position;
+        PreparedSource(Song song, int position) {
+            this.song = new Song(song);
+            this.position = position;
+        }
     }
 
     /** @return true when the track at {@code position} is known to be unplayable. */
@@ -494,17 +509,17 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     void saveQueuesImpl() {
-        ArrayList<IndexedSong> queue;
-        ArrayList<IndexedSong> originalQueue;
         synchronized (this) {
-            // Get a copy of the queues
-            queue = new ArrayList<>(playingQueue.getPlayingQueue());
-            originalQueue = new ArrayList<>(playingQueue.getOriginalPlayingQueue());
+            io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+                Discography discography = Discography.getInstance();
+                playingQueue.reconcileSources(discography.getAllSongsById(),
+                        discography.getConfirmedDeletedIds(), false);
+                MusicPlaybackQueueStore.getInstance(this).saveQueues(
+                        new ArrayList<>(playingQueue.getPlayingQueue()),
+                        new ArrayList<>(playingQueue.getOriginalPlayingQueue()));
+                return null;
+            });
         }
-        MusicPlaybackQueueStore.getInstance(this).saveQueues(
-                queue,
-                originalQueue
-        );
     }
 
     private void savePosition() {
@@ -546,8 +561,11 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     void restoreQueuesAndPosition() {
         synchronized (this) {
             try {
+                // A cold start must resolve saved entries against the committed
+                // catalog, never against an empty cache.
+                Discography.getInstance().ensureLoaded();
                 // The current playback state
-                final long savedSongId = getCurrentSong().id;
+                final Song savedSong = getCurrentSong();
 
                 // The saved state
                 final MusicPlaybackQueueStore queueStore = MusicPlaybackQueueStore.getInstance(this);
@@ -558,20 +576,23 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 final int restoredPositionInTrack = PreferenceManager.getDefaultSharedPreferences(this)
                         .getInt(SAVED_POSITION_IN_TRACK, -1);
 
-                playingQueue = new StaticPlayingQueue(
+                StaticPlayingQueue restored = new StaticPlayingQueue(
                         restoredQueue,
                         restoredOriginalQueue,
                         restoredPosition,
                         playingQueue.getShuffleMode(),
                         playingQueue.getRepeatMode()
                 );
+                restored.dropUnresolvedEntries();
+                playingQueue = restored;
                 queuesRestored = true;
 
                 // Before altering the player state, check that it is really necessary
                 // ie. we are changing song in between
                 // This prevents changing the player state, as it will stop the playback
-                final long currentSongId = getCurrentSong().id;
-                if (currentSongId != savedSongId) {
+                final Song currentSong = getSongAt(getPosition());
+                if (!io.github.omblivion.needle.model.SongSource.from(currentSong)
+                        .sameTrack(io.github.omblivion.needle.model.SongSource.from(savedSong))) {
                     if (openCurrent() && (restoredPositionInTrack > 0)) {
                         seek(restoredPositionInTrack);
                     }
@@ -666,7 +687,19 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     private boolean openCurrent() {
         synchronized (this) {
             try {
-                return (playback != null) && playback.setDataSource(getTrackUri(getCurrentSong()));
+                Song requested = getSongAt(getPosition());
+                PlaybackSourceResolver.Resolution source = PlaybackSourceResolver.resolve(this, requested);
+                if (source.status != PlaybackSourceResolver.Status.VERIFIED || playback == null) {
+                    return false;
+                }
+                if (playback.setDataSource(source.uri)) {
+                    openedSong = new Song(source.song);
+                    openedSource = io.github.omblivion.needle.model.SongSource.from(source.song);
+                    return true;
+                }
+                openedSong = null;
+                openedSource = null;
+                return false;
             } catch (Exception e) {
                 OopsHandler.collectStackTrace(e);
                 return false;
@@ -721,7 +754,21 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
      * tests can observe the preload without a real media player.
      */
     void setNextDataSource(String uri, int position) {
-        playback.setNextDataSource(uri);
+        // Only the current preload is ever needed; drop superseded tokens so the
+        // bookkeeping cannot grow without bound.
+        preparedSources.clear();
+        if (uri == null) {
+            playback.setNextDataSource(null);
+            return;
+        }
+        PlaybackSourceResolver.Resolution source = PlaybackSourceResolver.resolve(this, getSongAt(position));
+        if (source.status == PlaybackSourceResolver.Status.VERIFIED) {
+            long token = ++nextSourceToken;
+            preparedSources.put(token, new PreparedSource(source.song, position));
+            playback.setNextDataSource(source.uri, token);
+        } else {
+            playback.setNextDataSource(null);
+        }
     }
 
     /**
@@ -907,7 +954,10 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     public Song getCurrentSong() {
-        return getSongAt(getPosition());
+        synchronized (this) {
+            return openedSong != null && playback != null && playback.isInitialized()
+                    ? new Song(openedSong) : getSongAt(getPosition());
+        }
     }
 
     private Song getSongAt(int position) {
@@ -1564,11 +1614,38 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     @Override
-    public void onTrackWentToNext() {
+    public void onTrackWentToNext(long sourceToken) {
         synchronized (this) {
             if (playbackHandlerThread.isAlive()) {
-                playbackHandler.sendEmptyMessage(TRACK_WENT_TO_NEXT);
+                PreparedSource promoted = preparedSources.remove(sourceToken);
+                if (promoted != null) {
+                    playbackHandler.obtainMessage(TRACK_WENT_TO_NEXT, promoted).sendToTarget();
+                } else {
+                    // Do not continue unidentified audio after a stale/unknown promotion.
+                    playback.stop();
+                }
             }
+        }
+    }
+
+    void promotePreparedSource(PreparedSource promoted) {
+        synchronized (this) {
+            openedSong = new Song(promoted.song);
+            // Queue positions can have changed since this source was prepared.
+            int position = promoted.position;
+            if (position < 0 || position >= playingQueue.size()
+                    || !io.github.omblivion.needle.model.SongSource.from(getSongAt(position))
+                    .sameTrack(io.github.omblivion.needle.model.SongSource.from(promoted.song))) {
+                position = -1;
+                for (int i = 0; i < playingQueue.size(); i++) {
+                    if (io.github.omblivion.needle.model.SongSource.from(getSongAt(i))
+                            .sameTrack(io.github.omblivion.needle.model.SongSource.from(promoted.song))) {
+                        position = i;
+                        break;
+                    }
+                }
+            }
+            if (position >= 0) playingQueue.setCurrentPosition(position);
         }
     }
 
@@ -1706,12 +1783,43 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     private void onDiscographyChanged() {
-        final boolean resync = PreferenceUtil.getInstance().isQueueSyncWithMediaStoreEnabled();
-        if (resync) {
-            // If a song is removed from the MediaStore, or updated (tags edited)
-            // reload the queues so that they reflects the latest change
-            saveState();
-            restoreState();
+        if (playbackHandlerThread.isAlive()) {
+            playbackHandler.post(this::reconcileLibrary);
+        }
+    }
+
+    private void reconcileLibrary() {
+        synchronized (this) {
+            io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+                Discography discography = Discography.getInstance();
+                playingQueue.reconcileSources(discography.getAllSongsById(),
+                        discography.getConfirmedDeletedIds(),
+                        PreferenceUtil.getInstance().isQueueSyncWithMediaStoreEnabled());
+                if (openedSong != null) {
+                    Song logical = discography.resolveReference(openedSong);
+                    if (logical.id == Song.EMPTY_SONG.id) {
+                        playback.stop();
+                        openedSong = null;
+                        openedSource = null;
+                    } else if (openedSource == null
+                            || openedSource.versionChanged(io.github.omblivion.needle.model.SongSource.from(logical))) {
+                        // The open audio no longer matches the catalog entry: reopen
+                        // rather than describing old audio with new metadata.
+                        openedSong = null;
+                        openedSource = null;
+                        openCurrent();
+                    } else {
+                        openedSong = new Song(logical);
+                    }
+                }
+                prepareNextImpl();
+                saveQueuesImpl();
+                return null;
+            });
+            notifyChange(QUEUE_CHANGED);
+            updateNotification();
+            updateMediaSessionMetaData();
+            sendChangeInternal(META_CHANGED);
         }
     }
 }
