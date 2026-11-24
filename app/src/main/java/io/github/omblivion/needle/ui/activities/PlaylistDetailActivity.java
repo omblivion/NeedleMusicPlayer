@@ -25,6 +25,7 @@ import io.github.omblivion.needle.R;
 import io.github.omblivion.needle.adapter.song.OrderablePlaylistSongAdapter;
 import io.github.omblivion.needle.adapter.song.PlaylistSongAdapter;
 import io.github.omblivion.needle.adapter.song.SongAdapter;
+import io.github.omblivion.needle.adapter.song.UnplayableSongAdapter;
 import io.github.omblivion.needle.databinding.ActivityPlaylistDetailBinding;
 import io.github.omblivion.needle.databinding.SlidingMusicPanelLayoutBinding;
 import io.github.omblivion.needle.helper.menu.MenuHelper;
@@ -39,6 +40,7 @@ import io.github.omblivion.needle.model.TopTracksWindow;
 import io.github.omblivion.needle.model.smartplaylist.AbsSmartPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.LastAddedPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.NotRecentlyPlayedPlaylist;
+import io.github.omblivion.needle.model.smartplaylist.UnplayableTracksPlaylist;
 import io.github.omblivion.needle.provider.StaticPlaylist;
 import io.github.omblivion.needle.ui.activities.base.AbsSlidingMusicPanelActivity;
 import io.github.omblivion.needle.util.PlaylistsUtil;
@@ -109,7 +111,10 @@ public class PlaylistDetailActivity
             @ColorInt
             public int getPaletteColor() {return ThemeStore.primaryColor(PlaylistDetailActivity.this);}
         };
-        if (playlist instanceof AbsCustomPlaylist) {
+        if (playlist instanceof UnplayableTracksPlaylist) {
+            adapter = new UnplayableSongAdapter(this, new ArrayList<>(), holder);
+            layoutBinding.recyclerView.setAdapter(adapter);
+        } else if (playlist instanceof AbsCustomPlaylist) {
             adapter = new PlaylistSongAdapter(this, new ArrayList<>(), false, holder,
                     playlist instanceof io.github.omblivion.needle.model.smartplaylist.MyTopTracksPlaylist);
             layoutBinding.recyclerView.setAdapter(adapter);
@@ -244,6 +249,12 @@ public class PlaylistDetailActivity
     }
 
     @Override
+    public void onUnplayableTracksChanged() {
+        super.onUnplayableTracksChanged();
+        if (playlist instanceof UnplayableTracksPlaylist) reload();
+    }
+
+    @Override
     public void onPlayStateChanged() {
         super.onPlayStateChanged();
 
@@ -252,6 +263,9 @@ public class PlaylistDetailActivity
     }
 
     void checkIsEmpty() {
+        if (playlist instanceof UnplayableTracksPlaylist) {
+            layoutBinding.empty.setText(R.string.unplayable_files_empty);
+        }
         layoutBinding.empty.setVisibility(
                 adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE
         );

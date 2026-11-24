@@ -1,5 +1,27 @@
 # Changelog
 
+## Needle [0.2.0] - 2026-11-24
+
+### Features
+
+- Add an automatic **Unplayable files** playlist that remembers tracks that fail to open or play, without duplicates and across app restarts.
+- Show the affected file paths and support single or multiple file deletion through Android's confirmation dialog. No audio files are deleted automatically.
+- Retry reported tracks after the playback service restarts and dismiss their reports after sustained, advancing playback. Preparing a file, seeking, stalling, or playing a different file with a reused media ID does not dismiss a report.
+
+### Fixes
+
+- Request Android's deletion confirmation before changing the media database or playback queue; cancelling or failing deletion preserves the reports.
+- Check file identity before requesting deletion, preventing stale media IDs from targeting replacement files.
+- Restore pending deletion confirmations without launching duplicate requests after activity recreation, and remove completed helpers.
+- Use MediaStore confirmation directly on supported Android versions without requiring legacy folder access.
+- Keep playback running if the optional playback-error database cannot be read or updated.
+
+### Notes
+
+- Files are reported when playback fails; this feature does not perform a background corruption scan.
+- Reports remain available when permissions or storage are temporarily unavailable. Files deleted outside Needle can remain listed.
+- Requires Android 14 or newer.
+
 ## Needle [0.1.1] - 2026-11-17
 
 ### Fixes

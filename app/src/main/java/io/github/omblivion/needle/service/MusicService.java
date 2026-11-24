@@ -25,6 +25,7 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
+import android.os.SystemClock;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
@@ -57,6 +58,7 @@ import io.github.omblivion.needle.model.Song;
 import io.github.omblivion.needle.provider.HistoryStore;
 import io.github.omblivion.needle.provider.MusicPlaybackQueueStore;
 import io.github.omblivion.needle.provider.SongPlayCountStore;
+import io.github.omblivion.needle.provider.UnplayableTrackStore;
 import io.github.omblivion.needle.service.notification.CrashNotification;
 import io.github.omblivion.needle.service.notification.IdleNotification;
 import io.github.omblivion.needle.service.notification.PlayingNotification;
@@ -136,6 +138,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     static final int DUCK = 7;
     static final int UNDUCK = 8;
     static final int TRACK_FAILED = 9;
+    static final int CHECK_UNPLAYABLE_RECOVERY = 10;
 
     public static final int RANDOM_START_POSITION_ON_SHUFFLE = StaticPlayingQueue.INVALID_POSITION;
     public static final int SHUFFLE_MODE_NONE = StaticPlayingQueue.SHUFFLE_MODE_NONE;
@@ -214,6 +217,10 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     /** Tracks that failed to play in this session; never persisted. */
     private final UnplayableTrackRegistry unplayableTracks = new UnplayableTrackRegistry();
+    private Song recoverySong = Song.EMPTY_SONG;
+    private long recoveryLastSampleAt;
+    private int recoveryLastPosition;
+    private long recoveryProgressMillis;
 
     /** Consecutive automatic skips; reset once a track really plays for a while. */
     private int consecutiveSkipCount = 0;
@@ -1146,7 +1153,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
      */
     private void onTrackUnplayable() {
         final Song song = getCurrentSong();
-        unplayableTracks.markUnplayable(getTrackUri(song));
+        recordUnplayableTrack(song);
 
         if (song.id == Song.EMPTY_SONG.id) {
             SafeToast.show(this, getResources().getString(R.string.unplayable_file));
@@ -1156,6 +1163,80 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         }
 
         skipToNextPlayable(true);
+    }
+
+    private void recordUnplayableTrack(@NonNull Song song) {
+        unplayableTracks.markUnplayable(getTrackUri(song));
+        recoverySong = Song.EMPTY_SONG;
+        if (playbackHandler != null) playbackHandler.removeMessages(CHECK_UNPLAYABLE_RECOVERY);
+        try {
+            UnplayableTrackStore.getInstance(this).recordFailure(song);
+        } catch (Exception error) {
+            // Reporting must never prevent the player from skipping a broken file.
+            OopsHandler.collectStackTrace(error);
+        }
+    }
+
+    /** Observe actual playback, not preparation or a seek, before dismissing a report. */
+    void scheduleUnplayableTrackRecovery() {
+        synchronized (this) {
+            if (playbackHandler != null) playbackHandler.removeMessages(CHECK_UNPLAYABLE_RECOVERY);
+            recoverySong = Song.EMPTY_SONG;
+            try {
+                Song song = getCurrentSong();
+                if (!isPlaying() || unplayableTracks.isUnplayable(getTrackUri(song))
+                        || !UnplayableTrackStore.getInstance(this).contains(song)
+                        || !MusicUtil.isSongFileIdentityCurrent(this, song)) return;
+                recoverySong = song;
+                recoveryLastSampleAt = SystemClock.elapsedRealtime();
+                recoveryLastPosition = getSongProgressMillis();
+                recoveryProgressMillis = 0;
+                if (playbackHandler != null) {
+                    playbackHandler.sendEmptyMessageDelayed(CHECK_UNPLAYABLE_RECOVERY, 250);
+                }
+            } catch (RuntimeException error) {
+                // Optional maintenance data must never interrupt normal playback.
+                recoverySong = Song.EMPTY_SONG;
+                OopsHandler.collectStackTrace(error);
+            }
+        }
+    }
+
+    private long recoveryInterval(@NonNull Song song) {
+        return song.duration > 0 ? Math.max(1, Math.min(SKIP_RESET_PROGRESS_MS, song.duration / 2))
+                : SKIP_RESET_PROGRESS_MS;
+    }
+
+    void checkForRecoveredTrack() {
+        synchronized (this) {
+            Song song = getCurrentSong();
+            if (recoverySong.id == Song.EMPTY_SONG.id || !isPlaying()
+                    || song.id != recoverySong.id || !song.data.equals(recoverySong.data)
+                    || unplayableTracks.isUnplayable(getTrackUri(song))) return;
+            try {
+                long now = SystemClock.elapsedRealtime();
+                long elapsed = now - recoveryLastSampleAt;
+                int position = getSongProgressMillis();
+                long advance = (long) position - recoveryLastPosition;
+                // Ignore seek jumps, stalls, and long gaps where playback was not observed.
+                if (elapsed > 0 && elapsed <= 2000 && advance > 0 && advance <= elapsed + 250) {
+                    recoveryProgressMillis += Math.min(elapsed, advance);
+                }
+                recoveryLastSampleAt = now;
+                recoveryLastPosition = position;
+                if (recoveryProgressMillis >= recoveryInterval(song)) {
+                    if (MusicUtil.isSongFileIdentityCurrent(this, song)) {
+                        UnplayableTrackStore.getInstance(this).remove(song);
+                    }
+                    recoverySong = Song.EMPTY_SONG;
+                } else if (playbackHandler != null) {
+                    playbackHandler.sendEmptyMessageDelayed(CHECK_UNPLAYABLE_RECOVERY, 250);
+                }
+            } catch (RuntimeException error) {
+                recoverySong = Song.EMPTY_SONG;
+                OopsHandler.collectStackTrace(error);
+            }
+        }
     }
 
     /**
@@ -1391,6 +1472,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                     savePositionInTrack();
                 }
                 songPlayCountHelper.notifyPlayStateChanged(isPlaying);
+                scheduleUnplayableTrackRecovery();
                 break;
             case FAVORITE_STATE_CHANGED:
                 updateNotification();
@@ -1413,6 +1495,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                     }
                 }
                 songPlayCountHelper.notifySongChanged(currentSong, SongPlayCountStore.getInstance(this));
+                scheduleUnplayableTrackRecovery();
                 break;
             case QUEUE_CHANGED:
                 updateMediaSessionMetaData(); // because playing queue size might have changed
@@ -1501,11 +1584,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     @Override
     public void onTrackFailed() {
-        final String uri;
         synchronized (this) {
-            uri = getTrackUri(getCurrentSong());
+            recordUnplayableTrack(getCurrentSong());
         }
-        unplayableTracks.markUnplayable(uri);
         requestSkipOfUnplayableTrack();
     }
 

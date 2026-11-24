@@ -96,6 +96,10 @@ final class PlaybackHandler extends Handler {
                 service.prepareNextImpl();
                 break;
 
+            case MusicService.CHECK_UNPLAYABLE_RECOVERY:
+                service.checkForRecoveredTrack();
+                break;
+
             case MusicService.FOCUS_CHANGE:
                 switch (msg.arg1) {
                     case AudioManager.AUDIOFOCUS_GAIN:

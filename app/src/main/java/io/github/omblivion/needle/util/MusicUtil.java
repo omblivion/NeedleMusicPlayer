@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -18,6 +19,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
@@ -220,10 +222,56 @@ public class MusicUtil {
         return result;
     }
 
-    public static void deleteTracks(@NonNull final Fragment fragment, ActivityResultLauncher<IntentSenderRequest> deleteRequestApi30, @NonNull final List<Song> songs, @Nullable final List<Uri> safUris) {
+    public static boolean isSongFileIdentityCurrent(@NonNull Context context, @NonNull Song song) {
+        if (song.id < 0 || song.data.isEmpty()) return false;
+        try (Cursor cursor = context.getContentResolver().query(getSongFileUri(song.id),
+                new String[]{MediaStore.Audio.Media.DATA}, null, null, null)) {
+            return cursor != null && cursor.moveToFirst() && song.data.equals(cursor.getString(0));
+        } catch (RuntimeException error) {
+            OopsHandler.collectStackTrace(error);
+            return false;
+        }
+    }
+
+    @Nullable
+    @WorkerThread
+    public static PendingIntent prepareDeleteRequest(@NonNull Context context,
+                                                     @NonNull List<Song> songs) {
+        if (songs.isEmpty()) return null;
+        try {
+            List<Uri> urisToDelete = new ArrayList<>();
+            for (Song song : songs) {
+                if (!isSongFileIdentityCurrent(context, song)) return null;
+                urisToDelete.add(getSongFileUri(song.id));
+            }
+            return MediaStore.createDeleteRequest(context.getContentResolver(), urisToDelete);
+        } catch (RuntimeException error) {
+            OopsHandler.collectStackTrace(error);
+            return null;
+        }
+    }
+
+    public static boolean deleteTracks(@NonNull final Fragment fragment, ActivityResultLauncher<IntentSenderRequest> deleteRequestApi30, @NonNull final List<Song> songs, @Nullable final List<Uri> safUris) {
         final int songCount = songs.size();
+        if (songCount == 0) return false;
 
         Activity activity = fragment.requireActivity();
+
+        if (Build.VERSION.SDK_INT >= VERSION_CODES.R) {
+            // Android deletes the media only after the user accepts this request.
+            // Never mutate the media database or queue before that confirmation.
+            try {
+                PendingIntent request = prepareDeleteRequest(activity, songs);
+                if (request == null) return false;
+                deleteRequestApi30.launch(new IntentSenderRequest.Builder(request).build());
+                return true;
+            } catch (SecurityException | IllegalArgumentException | IllegalStateException error) {
+                OopsHandler.collectStackTrace(error);
+                SafeToast.show(activity, activity.getString(R.string.saf_delete_failed,
+                        Integer.toString(songCount)));
+            }
+            return false;
+        }
 
         try {
             // Step 1: Remove selected tracks from the current playlist
@@ -253,17 +301,6 @@ public class MusicUtil {
             else if (Build.VERSION.SDK_INT == VERSION_CODES.Q) {
                 // Android Q takes care of this if the element is remove via MediaStore
             }
-            else { // Android R and after
-                List<Uri> urisToDelete = new ArrayList<>();
-                for (Song song: songs) {
-                    // See: https://stackoverflow.com/questions/64472765/java-lang-illegalargumentexception-all-requested-items-must-be-referenced-by-sp
-                    urisToDelete.add(ContentUris.withAppendedId(MediaStore.Audio.Media.getContentUri("external"), song.id));
-                }
-                PendingIntent editPendingIntent = MediaStore.createDeleteRequest(activity.getContentResolver(),
-                        urisToDelete);
-
-                deleteRequestApi30.launch(new IntentSenderRequest.Builder(editPendingIntent).build());
-            }
         } catch (SecurityException e) { // | SendIntentException e) {
             OopsHandler.collectStackTrace(e);
         }
@@ -273,6 +310,7 @@ public class MusicUtil {
 
             SafeToast.show(activity, activity.getString(R.string.deleted_x_songs, songCount));
         }
+        return true;
     }
 
     public static boolean isFavoritePlaylist(@NonNull final Context context, @NonNull final Playlist playlist) {

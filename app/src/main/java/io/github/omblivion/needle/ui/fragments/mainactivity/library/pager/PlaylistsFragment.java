@@ -20,6 +20,7 @@ import io.github.omblivion.needle.model.smartplaylist.HistoryPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.LastAddedPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.MyTopTracksPlaylist;
 import io.github.omblivion.needle.model.smartplaylist.NotRecentlyPlayedPlaylist;
+import io.github.omblivion.needle.model.smartplaylist.UnplayableTracksPlaylist;
 import io.github.omblivion.needle.provider.StaticPlaylist;
 import io.github.omblivion.needle.util.PreferenceUtil;
 
@@ -105,6 +106,7 @@ public class PlaylistsFragment
             if (prefs.maintainTopTrackPlaylist()) {
                 playlists.add(new MyTopTracksPlaylist(context));
             }
+            playlists.add(new UnplayableTracksPlaylist(context));
 
             for (StaticPlaylist playlist : StaticPlaylist.getAllPlaylists()) {
                 playlists.add(playlist.asPlaylist());
@@ -121,6 +123,11 @@ public class PlaylistsFragment
     @Override
     public void onPlayingMetaChanged() {
         // Update the smart playlists (played, not played, etc)
+        reload();
+    }
+
+    @Override
+    public void onUnplayableTracksChanged() {
         reload();
     }
 

@@ -77,6 +77,9 @@ $env:JAVA_HOME="C:\Users\Leo\.jdks\ms-17.0.16"
 # Assemble debug and release APKs (fdroid flavor)
 .\gradlew.bat :app:assembleFdroidDebug :app:assembleFdroidRelease --console=plain
 
+# Official signed release APK (playStore flavor; requires keystore.properties)
+.\gradlew.bat :app:assemblePlayStoreRelease --console=plain
+
 # All six lint variants (must stay at zero errors; lint.abortOnError = true)
 .\gradlew.bat :app:lintFdroidDebug :app:lintFdroidRelease `
   :app:lintCiDebug :app:lintCiRelease `
@@ -129,6 +132,15 @@ Lint XML: `app/build/reports/lint-results-<variant>.xml`; count
   (`META_CHANGED`, `QUEUE_CHANGED`, `PLAY_STATE_CHANGED`, `STATISTICS_CHANGED`,
   ...); activities listen via `ui/activities/base/AbsMusicServiceActivity.java`
   and the `interfaces/MusicServiceEventListener` callbacks.
+- Unplayable files: `provider/UnplayableTrackStore.java` keeps SQLite snapshots
+  independently of `service/UnplayableTrackRegistry.java` (session-only skip
+  protection). `model/smartplaylist/UnplayableTracksPlaylist.java` exposes them
+  for cleanup; `UnplayableTrackStore.CHANGED` triggers
+  `onUnplayableTracksChanged()`. Do not prune reports merely because a file is
+  absent from the library: permission or storage loss can be temporary.
+- Modern file deletion: `dialogs/helper/DeleteSongsDialogApi30.java` prepares
+  MediaStore requests on a worker and launches confirmation on the UI thread.
+  Only confirmed deletion updates the queue and removes matching reports.
 - Preferences: `util/PreferenceUtil.java` + `util/PrefKey.java`
   (`PrefKey.exportableKey` marks a key as export/import-able). Settings UI is
   XML under `app/src/main/res/xml/pref_*.xml`; import/export validation lives in
@@ -147,6 +159,9 @@ Lint XML: `app/build/reports/lint-results-<variant>.xml`; count
 - `gh` CLI is installed and authenticated (account `omblivion`).
 - Signing: `keystore.properties` at the repo root (present locally); release
   APKs are signed via the `ci` signing config when it exists.
+- GitHub release assets follow the published convention: `fdroidDebug` for
+  the debug APK and `playStoreRelease` for the signed official APK. The
+  `fdroidRelease` APK is unsigned and is not the official release asset.
 
 ## House rules for agents
 

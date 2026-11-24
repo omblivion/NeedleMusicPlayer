@@ -1,37 +1,38 @@
 package io.github.omblivion.needle.dialogs.helper;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import io.github.omblivion.needle.R;
-import io.github.omblivion.needle.misc.WeakContextAsyncTask;
+import io.github.omblivion.needle.helper.MusicPlayerRemote;
 import io.github.omblivion.needle.model.Song;
-import io.github.omblivion.needle.ui.activities.saf.SAFGuideActivity;
+import io.github.omblivion.needle.provider.UnplayableTrackStore;
 import io.github.omblivion.needle.util.MusicUtil;
 import io.github.omblivion.needle.util.OopsHandler;
-import io.github.omblivion.needle.util.PreferenceUtil;
-import io.github.omblivion.needle.util.SAFUtil;
 import io.github.omblivion.needle.util.SafeToast;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.FutureTask;
 
 /**
  * @author Karim Abou Zeid (kabouzeid), Aidan Follestad (afollestad)
@@ -39,11 +40,16 @@ import java.util.List;
 @RequiresApi(api = VERSION_CODES.R)
 public class DeleteSongsDialogApi30 extends Fragment {
     private static final String SONGS = "songs";
+    private static final String REQUEST_STARTED = "request_started";
+    private static final String FINISHED = "finished";
 
-    private BaseDeleteSongsAsyncTask deleteSongsTask;
+    private boolean requestStarted;
+    private boolean finished;
+    private FutureTask<Void> preparation;
+    private FutureTask<Void> reportCleanup;
+    private PendingIntent preparedRequest;
+    private boolean preparationComplete;
     ArrayList<Song> songsToRemove;
-    ActivityResultLauncher<Intent> deleteSongs_SAFGuide;
-    private ActivityResultLauncher<Uri> deleteSongs_SAFTreePicker;
 
     private ActivityResultLauncher<IntentSenderRequest> deleteRequestApi30;
 
@@ -73,123 +79,119 @@ public class DeleteSongsDialogApi30 extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        deleteSongs_SAFGuide = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == Activity.RESULT_OK) {
-                        try {
-                            deleteSongs_SAFTreePicker.launch(Uri.parse(PreferenceUtil.getInstance().getStartDirectory().getAbsolutePath()));
-                        } catch (android.content.ActivityNotFoundException noActivity) {
-                            SafeToast.show(getActivity(), R.string.android13_no_file_browser_error);
-                        }
-                    }
-                });
-
-        deleteSongs_SAFTreePicker = registerForActivityResult(
-                new ActivityResultContracts.OpenDocumentTree() {
-                    @NonNull
-                    @Override
-                    public Intent createIntent(@NonNull Context context, Uri input) {
-                        return super.createIntent(context, input)
-                                .putExtra("android.content.extra.SHOW_ADVANCED", true);
-                    }
-                },
-                resultUri -> {
-                    if (deleteSongsTask != null) {
-                        deleteSongsTask.cancel(true);
-                    }
-                    deleteSongsTask = new AsyncTaskApi30(this);
-                    ((AsyncTaskApi30)deleteSongsTask).execute(resultUri);
-                });
-
         deleteRequestApi30 = registerForActivityResult(
                 new ActivityResultContracts.StartIntentSenderForResult(),
-                result -> {
-                    if (result.getResultCode() == Activity.RESULT_OK) {
-                        DeleteSongsHelper.managePlayingSong(songsToRemove);
-                        SafeToast.show(getActivity(), getString(R.string.deleted_x_songs, songsToRemove.size()));
-                    } else {
-                        SafeToast.show(getActivity(), getString(R.string.saf_delete_failed, Integer.toString(songsToRemove.size())));
-                    }
-                });
+                result -> handleDeleteResult(result.getResultCode()));
 
         songsToRemove = requireArguments().getParcelableArrayList(SONGS);
 
-        deleteSongsTask = new DeleteSongsAsyncTask(this);
-        ((DeleteSongsAsyncTask)deleteSongsTask).execute(songsToRemove);
+        if (savedInstanceState != null) {
+            requestStarted = savedInstanceState.getBoolean(REQUEST_STARTED);
+            finished = savedInstanceState.getBoolean(FINISHED);
+        }
+        if (finished) {
+            retire();
+        } else if (!requestStarted) {
+            // Android 11+ uses the MediaStore confirmation, not legacy SAF permissions.
+            deleteSongs(songsToRemove);
+        }
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (preparationComplete) onDeleteRequestPrepared(preparedRequest);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (preparation != null) preparation.cancel(true);
+        super.onDestroy();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(REQUEST_STARTED, requestStarted);
+        outState.putBoolean(FINISHED, finished);
+    }
+
+    @MainThread
+    void handleDeleteResult(int resultCode) {
+        if (finished) return;
+        finished = true;
+        if (resultCode == Activity.RESULT_OK) {
+            Context context = requireContext().getApplicationContext();
+            List<Song> songs = new ArrayList<>(songsToRemove);
+            reportCleanup = new FutureTask<>(() -> {
+                try {
+                    DeleteSongsHelper.managePlayingSong(new ArrayList<>(songs));
+                    MusicPlayerRemote.removeFromQueue(songs);
+                    UnplayableTrackStore store = UnplayableTrackStore.getInstance(context);
+                    for (Song song : songs) store.remove(song);
+                } catch (RuntimeException error) {
+                    OopsHandler.collectStackTrace(error);
+                }
+                return null;
+            });
+            // Confirmed deletion cleanup must survive removal of this helper.
+            AsyncTask.THREAD_POOL_EXECUTOR.execute(reportCleanup);
+            SafeToast.show(getActivity(), getString(R.string.deleted_x_songs, songsToRemove.size()));
+        } else {
+            SafeToast.show(getActivity(), getString(R.string.saf_delete_failed,
+                    Integer.toString(songsToRemove.size())));
+        }
+        retire();
+    }
+
+    private void retire() {
+        getParentFragmentManager().beginTransaction().remove(this).commitAllowingStateLoss();
     }
 
     void deleteSongs(List<Song> songsToRemove) {
-        MusicUtil.deleteTracks(DeleteSongsDialogApi30.this, this.deleteRequestApi30, songsToRemove, null);
-    }
-
-    public static abstract class BaseDeleteSongsAsyncTask<Params> extends
-            WeakContextAsyncTask<Params, Integer, Void> {
-        protected final WeakReference<DeleteSongsDialogApi30> fragment;
-        protected final WeakReference<FragmentActivity> activity;
-
-        public BaseDeleteSongsAsyncTask(DeleteSongsDialogApi30 fragment) {
-            super(fragment.getActivity());
-            this.fragment = new WeakReference<>(fragment);
-            this.activity = new WeakReference<>(fragment.getActivity());
-        }
-    }
-
-    private static class DeleteSongsAsyncTask
-            extends BaseDeleteSongsAsyncTask<List<Song>> {
-        public DeleteSongsAsyncTask(DeleteSongsDialogApi30 fragment) {
-            super(fragment);
-        }
-
-        @SafeVarargs
-        @Override
-        protected final Void doInBackground(List<Song>... lists) {
-            DeleteSongsDialogApi30 fragment = this.fragment.get();
-            FragmentActivity activity = this.activity.get();
-
-            try {
-                if (fragment == null || activity == null) {return null;}
-
-                final List<Song> songs = lists[0];
-                if (!SAFUtil.isSAFRequired(songs)) {
-                    fragment.deleteSongs(songs);
-                } else {
-                    if (SAFUtil.isSDCardAccessGranted(activity)) {
-                        fragment.deleteSongs(songs);
-                    } else {
-                        fragment.deleteSongs_SAFGuide.launch(new Intent(activity, SAFGuideActivity.class));
-                    }
+        Context context = requireContext().getApplicationContext();
+        List<Song> songs = new ArrayList<>(songsToRemove);
+        WeakReference<DeleteSongsDialogApi30> target = new WeakReference<>(this);
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        preparation = new FutureTask<>(() -> {
+            PendingIntent request = MusicUtil.prepareDeleteRequest(context, songs);
+            mainHandler.post(() -> {
+                DeleteSongsDialogApi30 fragment = target.get();
+                if (fragment != null && fragment.isAdded() && fragment.preparation != null
+                        && !fragment.preparation.isCancelled()) {
+                    fragment.onDeleteRequestPrepared(request);
                 }
-            } catch (Exception e) {
-                OopsHandler.collectStackTrace(e);
-            }
-
+            });
             return null;
+        });
+        AsyncTask.THREAD_POOL_EXECUTOR.execute(preparation);
+    }
+
+    @MainThread
+    void onDeleteRequestPrepared(@Nullable PendingIntent request) {
+        if (finished || requestStarted) return;
+        if (getParentFragmentManager().isStateSaved()) {
+            preparedRequest = request;
+            preparationComplete = true;
+            return;
+        }
+        preparedRequest = null;
+        preparationComplete = false;
+        if (request == null) {
+            handleDeleteResult(Activity.RESULT_CANCELED);
+            return;
+        }
+        requestStarted = true;
+        try {
+            launchConfirmation(request);
+        } catch (RuntimeException error) {
+            OopsHandler.collectStackTrace(error);
+            handleDeleteResult(Activity.RESULT_CANCELED);
         }
     }
 
-    private static class AsyncTaskApi30
-            extends BaseDeleteSongsAsyncTask<Uri> {
-
-        public AsyncTaskApi30(DeleteSongsDialogApi30 dialog) {
-            super(dialog);
-        }
-
-        @Override
-        protected Void doInBackground(Uri... uris) {
-            try {
-                DeleteSongsDialogApi30 fragment = this.fragment.get();
-                FragmentActivity activity = this.activity.get();
-
-                if (fragment == null || activity == null) {return null;}
-
-                SAFUtil.saveTreeUri(activity, uris[0]);
-                fragment.deleteSongs(fragment.songsToRemove);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            return null;
-        }
+    @MainThread
+    void launchConfirmation(@NonNull PendingIntent request) {
+        deleteRequestApi30.launch(new IntentSenderRequest.Builder(request).build());
     }
 }

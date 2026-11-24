@@ -23,4 +23,8 @@ public interface MusicServiceEventListener {
     /** Called when play statistics change; most-played views refresh here. */
     default void onStatisticsChanged() {
     }
+
+    /** Called when persistent playback-error reports change. */
+    default void onUnplayableTracksChanged() {
+    }
 }

@@ -20,6 +20,7 @@ import io.github.omblivion.needle.discog.Discography;
 import io.github.omblivion.needle.helper.MusicPlayerRemote;
 import io.github.omblivion.needle.interfaces.MusicServiceEventListener;
 import io.github.omblivion.needle.service.MusicService;
+import io.github.omblivion.needle.provider.UnplayableTrackStore;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -96,6 +97,7 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
             filter.addAction(MusicService.MEDIA_STORE_CHANGED);
             filter.addAction(MusicService.FAVORITE_STATE_CHANGED);
             filter.addAction(MusicService.STATISTICS_CHANGED);
+            filter.addAction(UnplayableTrackStore.CHANGED);
 
             registerReceiver(musicStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
@@ -169,6 +171,13 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
     }
 
     @Override
+    public void onUnplayableTracksChanged() {
+        for (MusicServiceEventListener listener : mMusicServiceEventListeners) {
+            if (listener != null) listener.onUnplayableTracksChanged();
+        }
+    }
+
+    @Override
     public void onRepeatModeChanged() {
         for (MusicServiceEventListener listener : mMusicServiceEventListeners) {
             if (listener != null) {
@@ -221,6 +230,9 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
                         break;
                     case MusicService.STATISTICS_CHANGED:
                         activity.onStatisticsChanged();
+                        break;
+                    case UnplayableTrackStore.CHANGED:
+                        activity.onUnplayableTracksChanged();
                         break;
                 }
             }
