@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 
 class DB extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "discography.db";
-    private static final int VERSION = 7;
+    private static final int VERSION = 8;
 
     DB() {
         super(App.getInstance().getApplicationContext(), DATABASE_NAME, null, VERSION);
@@ -50,7 +50,13 @@ class DB extends SQLiteOpenHelper {
                         + SongColumns.TRACK_DURATION + " LONG, "
                         + SongColumns.TRACK_NUMBER + " LONG, "
                         + SongColumns.TRACK_TITLE + " TEXT, "
-                        + SongColumns.YEAR + " LONG"
+                        + SongColumns.YEAR + " LONG, "
+                        + SongColumns.CONTENT_URI + " TEXT NOT NULL DEFAULT '', "
+                        + SongColumns.SOURCE_SIZE + " LONG NOT NULL DEFAULT -1, "
+                        + SongColumns.SOURCE_GENERATION + " LONG NOT NULL DEFAULT -1, "
+                        + SongColumns.SOURCE_ADDED_GENERATION + " LONG NOT NULL DEFAULT -1, "
+                        + SongColumns.PROVIDER_VERSION + " TEXT NOT NULL DEFAULT '', "
+                        + SongColumns.METADATA_RETRY_NEEDED + " INTEGER NOT NULL DEFAULT 1"
                         + ");"
         );
     }
@@ -66,6 +72,15 @@ class DB extends SQLiteOpenHelper {
     }
 
     private void migrateDB(@NonNull SQLiteDatabase dbase, int oldVersion, int newVersion) {
+        if (oldVersion == 7 && newVersion == 8) {
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN content_uri TEXT NOT NULL DEFAULT ''");
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN source_size LONG NOT NULL DEFAULT -1");
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN source_generation LONG NOT NULL DEFAULT -1");
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN source_added_generation LONG NOT NULL DEFAULT -1");
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN provider_version TEXT NOT NULL DEFAULT ''");
+            dbase.execSQL("ALTER TABLE songs ADD COLUMN metadata_retry_needed INTEGER NOT NULL DEFAULT 1");
+            return;
+        }
         final Consumer<SQLiteDatabase> migrateResetAll = (db) -> {
             db.execSQL(String.format("DROP TABLE IF EXISTS %s", SongColumns.NAME));
             onCreate(db);
@@ -101,6 +116,13 @@ class DB extends SQLiteOpenHelper {
 
     synchronized void addSong(@NonNull Song song) {
         try (final SQLiteDatabase db = getWritableDatabase()) {
+            db.insertOrThrow(SongColumns.NAME, null, valuesFor(song));
+        } catch (Exception e) {
+            OopsHandler.collectStackTrace(e);
+        }
+    }
+
+    private ContentValues valuesFor(Song song) {
             final ContentValues values = new ContentValues();
             values.put(SongColumns.ID, song.id);
             values.put(SongColumns.ALBUM_ID, song.albumId);
@@ -120,10 +142,25 @@ class DB extends SQLiteOpenHelper {
             values.put(SongColumns.TRACK_NUMBER, song.trackNumber);
             values.put(SongColumns.TRACK_TITLE, song.title);
             values.put(SongColumns.YEAR, song.year);
+            values.put(SongColumns.CONTENT_URI, song.contentUri);
+            values.put(SongColumns.SOURCE_SIZE, song.sourceSize);
+            values.put(SongColumns.SOURCE_GENERATION, song.sourceGeneration);
+            values.put(SongColumns.SOURCE_ADDED_GENERATION, song.sourceAddedGeneration);
+            values.put(SongColumns.PROVIDER_VERSION, song.providerVersion);
+            values.put(SongColumns.METADATA_RETRY_NEEDED, song.metadataRetryNeeded ? 1 : 0);
 
-            db.insert(SongColumns.NAME, null, values);
-        } catch (Exception e) {
-            OopsHandler.collectStackTrace(e);
+            return values;
+    }
+
+    synchronized void replaceSongs(@NonNull Collection<Song> songs) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete(SongColumns.NAME, null, null);
+            for (Song song : songs) db.insertOrThrow(SongColumns.NAME, null, valuesFor(song));
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
     }
 
@@ -170,7 +207,13 @@ class DB extends SQLiteOpenHelper {
                         SongColumns.TRACK_DURATION,
                         SongColumns.TRACK_NUMBER,
                         SongColumns.TRACK_TITLE,
-                        SongColumns.YEAR
+                        SongColumns.YEAR,
+                        SongColumns.CONTENT_URI,
+                        SongColumns.SOURCE_SIZE,
+                        SongColumns.SOURCE_GENERATION,
+                        SongColumns.SOURCE_ADDED_GENERATION,
+                        SongColumns.PROVIDER_VERSION,
+                        SongColumns.METADATA_RETRY_NEEDED
                 },
                 null,
                 null,
@@ -222,6 +265,12 @@ class DB extends SQLiteOpenHelper {
                 song.replayGainAlbum = replayGainAlbum;
                 song.replayGainPeakTrack = replayGainPeakTrack;
                 song.replayGainPeakAlbum = replayGainPeakAlbum;
+                song.contentUri = cursor.getString(cursor.getColumnIndexOrThrow(SongColumns.CONTENT_URI));
+                song.sourceSize = cursor.getLong(cursor.getColumnIndexOrThrow(SongColumns.SOURCE_SIZE));
+                song.sourceGeneration = cursor.getLong(cursor.getColumnIndexOrThrow(SongColumns.SOURCE_GENERATION));
+                song.sourceAddedGeneration = cursor.getLong(cursor.getColumnIndexOrThrow(SongColumns.SOURCE_ADDED_GENERATION));
+                song.providerVersion = cursor.getString(cursor.getColumnIndexOrThrow(SongColumns.PROVIDER_VERSION));
+                song.metadataRetryNeeded = cursor.getInt(cursor.getColumnIndexOrThrow(SongColumns.METADATA_RETRY_NEEDED)) != 0;
 
                 songs.add(song);
             } while (cursor.moveToNext());
@@ -251,5 +300,11 @@ class DB extends SQLiteOpenHelper {
         String TRACK_TITLE = "track_title";
         String TRACK_NUMBER = "track_number";
         String YEAR = "year";
+        String CONTENT_URI = "content_uri";
+        String SOURCE_SIZE = "source_size";
+        String SOURCE_GENERATION = "source_generation";
+        String SOURCE_ADDED_GENERATION = "source_added_generation";
+        String PROVIDER_VERSION = "provider_version";
+        String METADATA_RETRY_NEEDED = "metadata_retry_needed";
     }
 }

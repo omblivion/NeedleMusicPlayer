@@ -32,7 +32,7 @@ import java.util.List;
 
 public class HistoryStore extends SQLiteOpenHelper {
     public static final String DATABASE_NAME = "history.db";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     @Nullable
     private static HistoryStore sInstance = null;
 
@@ -43,20 +43,24 @@ public class HistoryStore extends SQLiteOpenHelper {
     @Override
     public void onCreate(@NonNull final SQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS " + RecentStoreColumns.NAME + " ("
-                + RecentStoreColumns.ID + " LONG NOT NULL," + RecentStoreColumns.TIME_PLAYED
-                + " LONG NOT NULL);");
+                + RecentStoreColumns.ID + " LONG NOT NULL,"
+                + RecentStoreColumns.TIME_PLAYED + " LONG NOT NULL,"
+                + RecentStoreColumns.PATH + " TEXT NOT NULL DEFAULT '');");
     }
 
     @Override
     public void onUpgrade(@NonNull SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + RecentStoreColumns.NAME);
-        onCreate(db);
+        // Non-destructive: an existing reference keeps its row and starts with
+        // an empty path, which resolves once a matching path is published.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE " + RecentStoreColumns.NAME
+                    + " ADD COLUMN " + RecentStoreColumns.PATH + " TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     @Override
     public void onDowngrade(@NonNull SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + RecentStoreColumns.NAME);
-        onCreate(db);
+        // Leave the data intact rather than dropping it.
     }
 
     @NonNull
@@ -68,14 +72,34 @@ public class HistoryStore extends SQLiteOpenHelper {
     }
 
     public void addSongId(final long songId) {
+        addSongId(songId, "");
+    }
+
+    public void addSongId(final long songId, @NonNull String path) {
         if (songId == Song.EMPTY_SONG.id) {
             return;
         }
-        addSongIds(List.of(songId));
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            addSongKeysInternal(List.of(new ReferenceKey(songId, path)));
+            return null;
+        });
     }
 
     public void addSongIds(@NonNull List<Long> songIds) {
-        if (songIds.isEmpty()) {
+        List<ReferenceKey> keys = new ArrayList<>();
+        for (Long id : songIds) keys.add(new ReferenceKey(id, ""));
+        addSongKeys(keys);
+    }
+
+    public void addSongKeys(@NonNull List<ReferenceKey> keys) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            addSongKeysInternal(keys);
+            return null;
+        });
+    }
+
+    private void addSongKeysInternal(List<ReferenceKey> keys) {
+        if (keys.isEmpty()) {
             return;
         }
 
@@ -84,16 +108,17 @@ public class HistoryStore extends SQLiteOpenHelper {
 
         try {
             long importTime = System.currentTimeMillis();
-            final ContentValues values = new ContentValues(2);
+            final ContentValues values = new ContentValues(3);
 
-            for (long songId : songIds) {
+            for (ReferenceKey key : keys) {
                 // remove previous entries
-                removeSongId(database, songId);
+                removeSongId(database, key.id());
 
                 // add the entry
                 values.clear();
-                values.put(RecentStoreColumns.ID, songId);
+                values.put(RecentStoreColumns.ID, key.id());
                 values.put(RecentStoreColumns.TIME_PLAYED, importTime);
+                values.put(RecentStoreColumns.PATH, key.path());
                 database.insert(RecentStoreColumns.NAME, null, values);
             }
             database.setTransactionSuccessful();
@@ -103,6 +128,13 @@ public class HistoryStore extends SQLiteOpenHelper {
     }
 
     public void removeSongIds(@NonNull List<Long> missingIds) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            removeSongIdsInternal(missingIds);
+            return null;
+        });
+    }
+
+    private void removeSongIdsInternal(List<Long> missingIds) {
         if (missingIds.isEmpty()) return;
 
         final SQLiteDatabase database = getWritableDatabase();
@@ -129,6 +161,10 @@ public class HistoryStore extends SQLiteOpenHelper {
     }
 
     public boolean contains(long id) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> containsInternal(id));
+    }
+
+    private boolean containsInternal(long id) {
         final SQLiteDatabase database = getReadableDatabase();
         Cursor cursor = database.query(RecentStoreColumns.NAME,
                 new String[]{RecentStoreColumns.ID},
@@ -145,9 +181,26 @@ public class HistoryStore extends SQLiteOpenHelper {
 
     @NonNull
     public ArrayList<Long> getRecentIds(long cutoff) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> getRecentIdsInternal(cutoff));
+    }
+
+    private ArrayList<Long> getRecentIdsInternal(long cutoff) {
         try (Cursor cursor = queryRecentIds(cutoff)) {
             return StoreLoader.getIdsFromCursor(cursor, RecentStoreColumns.ID);
         }
+    }
+
+    @NonNull
+    public ArrayList<ReferenceKey> getRecentKeys(long cutoff) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            ArrayList<ReferenceKey> keys = new ArrayList<>();
+            try (Cursor cursor = queryRecentIds(cutoff)) {
+                while (cursor.moveToNext()) {
+                    keys.add(new ReferenceKey(cursor.getLong(0), cursor.getString(1)));
+                }
+            }
+            return keys;
+        });
     }
 
     private Cursor queryRecentIds(long cutoff) {
@@ -158,7 +211,7 @@ public class HistoryStore extends SQLiteOpenHelper {
         final SQLiteDatabase database = getReadableDatabase();
 
         return database.query(RecentStoreColumns.NAME,
-                new String[]{RecentStoreColumns.ID},
+                new String[]{RecentStoreColumns.ID, RecentStoreColumns.PATH},
                 noCutoffTime ? null : RecentStoreColumns.TIME_PLAYED + (reverseOrder ? "<?" : ">?"),
                 noCutoffTime ? null : new String[]{String.valueOf(cutoff)},
                 null, null,
@@ -170,5 +223,6 @@ public class HistoryStore extends SQLiteOpenHelper {
 
         String ID = "song_id";
         String TIME_PLAYED = "time_played";
+        String PATH = "path";
     }
 }

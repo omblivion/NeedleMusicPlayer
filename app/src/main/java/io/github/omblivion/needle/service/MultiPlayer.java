@@ -26,6 +26,7 @@ import io.github.omblivion.needle.util.SafeToast;
  * @author Andrew Neal, Karim Abou Zeid (kabouzeid)
  */
 public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener {
+    private long nextSourceToken;
     public static final String TAG = MultiPlayer.class.getSimpleName();
 
     private MediaPlayer mCurrentMediaPlayer = new MediaPlayer();
@@ -114,6 +115,12 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
      */
     @Override
     public void setNextDataSource(@Nullable final String path) {
+        setNextDataSource(path, 0);
+    }
+
+    @Override
+    public void setNextDataSource(@Nullable final String path, long sourceToken) {
+        nextSourceToken = sourceToken;
         if (context == null) {
             return;
         }
@@ -442,6 +449,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
     }
     @Override
     public void onCompletion(final MediaPlayer mp) {
+        if (mp != mCurrentMediaPlayer) return;
         if (mp == mCurrentMediaPlayer && mNextMediaPlayer != null) {
             mIsInitialized = false;
             mCurrentMediaPlayer.release();
@@ -449,7 +457,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             mIsInitialized = true;
             mNextMediaPlayer = null;
             if (callbacks != null)
-                callbacks.onTrackWentToNext();
+                callbacks.onTrackWentToNext(nextSourceToken);
         } else {
             if (callbacks != null)
                 callbacks.onTrackEnded();

@@ -381,6 +381,9 @@
     <string name="dialog_ringtone_message">Please allow Needle Music Player to modify system settings in the next screen before setting the ringtone.</string>
     <string name="action_scan_directory">Scan directory</string>
     <string name="reset_discography">Rescan library</string>
+    <string name="library_rebuild_warning">Rebuild the music catalog from files in your library and its subfolders.\n\nAudio files are not modified. Playlists, favorites and listening statistics are kept for tracks that remain or can be identified as the same track. Confirmed deleted tracks are removed from those lists and statistics too.\n\nTemporarily inaccessible files are not treated as deleted.</string>
+    <string name="library_scan_completed">Library scan completed</string>
+    <string name="library_scan_deferred">Some files could not be checked. Existing references have been kept.</string>
     <string name="reset_discography_warning">This will clear and rebuild the app internal song database.\n\nNo song will be deleted during this operation, but this might clear the play history.\n\nDuring a possible long duration, until the rescan is complete, you will not be able to use the app normally</string>
     <string name="none">None</string>
     <string name="track">Track</string>

@@ -180,7 +180,7 @@ public class MainActivity extends AbsSlidingMusicPanelActivity implements Palett
             } else if (itemId == R.id.action_reset_discography) {
                 new MaterialDialog.Builder(this)
                         .title(R.string.reset_discography)
-                        .content(R.string.reset_discography_warning)
+                        .content(R.string.library_rebuild_warning)
                         .autoDismiss(true)
                         .onPositive((dialog, which) -> Discography.getInstance().triggerSyncWithMediaStore(true))
                         .positiveText(R.string.reset_discography)

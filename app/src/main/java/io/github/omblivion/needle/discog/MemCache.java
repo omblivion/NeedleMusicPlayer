@@ -53,6 +53,18 @@ class MemCache {
     final Map<Long, ArrayList<Song>> songsByGenreId = new HashMap<>();
     private float maxReplayGain = Float.NaN; // Computed lazily when it's needed, since it's used only on some android versions
 
+    void replaceWith(MemCache prepared) {
+        clear();
+        songsById.putAll(prepared.songsById);
+        artistsByName.putAll(prepared.artistsByName);
+        artistsById.putAll(prepared.artistsById);
+        albumsByAlbumIdAndArtistId.putAll(prepared.albumsByAlbumIdAndArtistId);
+        albumsByName.putAll(prepared.albumsByName);
+        genresByName.putAll(prepared.genresByName);
+        songsByGenreId.putAll(prepared.songsByGenreId);
+        maxReplayGain = Float.NaN;
+    }
+
     synchronized void addSong(@NonNull final Song song) {
         Map<Long, AlbumSlice> albums = getOrCreateAlbum(song);
         for (Album album : albums.values()) {

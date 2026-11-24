@@ -33,5 +33,6 @@ public class MediaStoreObserver extends ContentObserver implements Runnable {
         // actually call refresh when the delayed callback fires
         // do not send a sticky broadcast here
         mMusicService.handleAndSendChangeInternal(MusicService.MEDIA_STORE_CHANGED);
+        io.github.omblivion.needle.discog.Discography.getInstance().triggerSyncWithMediaStore(false);
     }
 }

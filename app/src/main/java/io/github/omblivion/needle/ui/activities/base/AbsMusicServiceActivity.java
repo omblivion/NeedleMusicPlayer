@@ -37,6 +37,12 @@ public abstract class AbsMusicServiceActivity extends AbsBaseActivity implements
     private boolean receiverRegistered;
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        Discography.getInstance().triggerSyncWithMediaStore(false);
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         serviceToken = MusicPlayerRemote.bindToService(this, new ServiceConnection() {

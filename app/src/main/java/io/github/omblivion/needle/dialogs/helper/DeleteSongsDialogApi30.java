@@ -127,6 +127,7 @@ public class DeleteSongsDialogApi30 extends Fragment {
                 try {
                     DeleteSongsHelper.managePlayingSong(new ArrayList<>(songs));
                     MusicPlayerRemote.removeFromQueue(songs);
+                    io.github.omblivion.needle.discog.Discography.getInstance().confirmDeletion(songs);
                     UnplayableTrackStore store = UnplayableTrackStore.getInstance(context);
                     for (Song song : songs) store.remove(song);
                 } catch (RuntimeException error) {

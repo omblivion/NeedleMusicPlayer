@@ -463,12 +463,10 @@ public class FoldersFragment
         if (toBeScanned == null || toBeScanned.length < 1) {
             SafeToast.show(activity, R.string.nothing_to_scan);
         } else {
-            MediaScannerConnection.scanFile(
-                    activity,
-                    toBeScanned,
-                    null,
-                    new UpdateToastMediaScannerCompletionListener(activity, toBeScanned)
-            );
+            java.util.ArrayList<File> files = new java.util.ArrayList<>();
+            for (String path : toBeScanned) files.add(new File(path));
+            io.github.omblivion.needle.discog.Discography.getInstance().getScanCoordinator()
+                    .requestScan(new io.github.omblivion.needle.discog.LibraryScanCoordinator.ScanRequest(true, files));
         }
     }
 

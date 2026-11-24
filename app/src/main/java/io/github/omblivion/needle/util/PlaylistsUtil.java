@@ -100,7 +100,8 @@ public class PlaylistsUtil {
         StaticPlaylist list = StaticPlaylist.getPlaylist(playlistId);
         if (list == null) {return;}
 
-        list.removeSong(song.id);
+        Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
+        list.removeSong(logical.id);
         notifyChange(context);
     }
 

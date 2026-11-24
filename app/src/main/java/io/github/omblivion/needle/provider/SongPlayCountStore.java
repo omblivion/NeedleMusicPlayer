@@ -44,7 +44,7 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
     private static SongPlayCountStore sInstance = null;
 
     public static final String DATABASE_NAME = "song_play_count.db";
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     // How many epoch weeks the default (52w) view exposes legacy buckets for.
     private static final int LEGACY_WEEKS = 52;
@@ -79,13 +79,16 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(@NonNull final SQLiteDatabase db, final int oldVersion, final int newVersion) {
-        // Never call the old destructive upgrade. Add v4 tables and import the
-        // recoverable weekly buckets from the v3 archive exactly once.
+        // Never call the old destructive upgrade. Add the new tables and the
+        // path column, and import the recoverable weekly buckets exactly once.
         createStatsTable(db);
         createEventsTable(db);
         createLegacyWeeksTable(db);
         if (oldVersion < 4) {
             importLegacyWeeks(db);
+        }
+        if (oldVersion < 5) {
+            addPathColumn(db);
         }
     }
 
@@ -98,7 +101,16 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE IF NOT EXISTS " + Columns.STATS + " ("
                 + Columns.ID + " LONG PRIMARY KEY, "
                 + Columns.TOTAL_COUNT + " LONG NOT NULL DEFAULT 0, "
-                + Columns.RESET_VERSION + " LONG NOT NULL DEFAULT 0)");
+                + Columns.RESET_VERSION + " LONG NOT NULL DEFAULT 0, "
+                + Columns.PATH + " TEXT NOT NULL DEFAULT '')");
+    }
+
+    /** Non-destructive: existing counts survive with an empty path. */
+    private static void addPathColumn(@NonNull SQLiteDatabase db) {
+        if (!tableHasColumn(db, Columns.STATS, Columns.PATH)) {
+            db.execSQL("ALTER TABLE " + Columns.STATS
+                    + " ADD COLUMN " + Columns.PATH + " TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     private static void createEventsTable(@NonNull SQLiteDatabase db) {
@@ -242,6 +254,19 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
      */
     public void recordPlay(final long songId, final long timestampMs, @NonNull final String occurrence,
                            final long resetVersion) {
+        recordPlay(new ReferenceKey(songId, ""), timestampMs, occurrence, resetVersion);
+    }
+
+    public void recordPlay(@NonNull ReferenceKey key, final long timestampMs,
+                           @NonNull final String occurrence, final long resetVersion) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            recordPlayInternal(key, timestampMs, occurrence, resetVersion);
+            return null;
+        });
+    }
+
+    private void recordPlayInternal(ReferenceKey key, long timestampMs, String occurrence, long resetVersion) {
+        long songId = key.id();
         if (songId == -1) {
             return;
         }
@@ -264,9 +289,10 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
                 return;
             }
 
-            ContentValues stats = new ContentValues(2);
+            ContentValues stats = new ContentValues(3);
             stats.put(Columns.TOTAL_COUNT, getTotalCountInternal(database, songId) + 1);
             stats.put(Columns.RESET_VERSION, getResetVersionInternal(database, songId));
+            stats.put(Columns.PATH, key.path());
             if (database.update(Columns.STATS, stats, Columns.ID + "=?",
                     new String[] {String.valueOf(songId)}) == 0) {
                 stats.put(Columns.ID, songId);
@@ -284,6 +310,13 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
      * storage and playback are not touched.
      */
     public void resetSong(final long songId) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            resetSongInternal(songId);
+            return null;
+        });
+    }
+
+    private void resetSongInternal(long songId) {
         final SQLiteDatabase database = getWritableDatabase();
         database.beginTransaction();
         try {
@@ -308,7 +341,8 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     /** @return the song's persistent reset version, or 0 when never reset. */
     public long getResetVersion(final long songId) {
-        return getResetVersionInternal(getReadableDatabase(), songId);
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
+                getResetVersionInternal(getReadableDatabase(), songId));
     }
 
     private static long getResetVersionInternal(@NonNull SQLiteDatabase database, long songId) {
@@ -327,6 +361,13 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     /** Removes all statistics. */
     public void clear() {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            clearInternal();
+            return null;
+        });
+    }
+
+    private void clearInternal() {
         final SQLiteDatabase database = getWritableDatabase();
         database.beginTransaction();
         try {
@@ -348,6 +389,11 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
      * @param nowMillis  the reference instant for window cutoffs
      */
     public Cursor getTopPlayedResults(int numResults, @NonNull TopTracksWindow window, long nowMillis) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
+                getTopPlayedResultsInternal(numResults, window, nowMillis));
+    }
+
+    private Cursor getTopPlayedResultsInternal(int numResults, TopTracksWindow window, long nowMillis) {
         final SQLiteDatabase database = getReadableDatabase();
 
         if (window == TopTracksWindow.ALL_TIME) {
@@ -417,6 +463,7 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         String STATS = "play_count_stats";
         String TOTAL_COUNT = "total_count";
         String RESET_VERSION = "reset_version";
+        String PATH = "path";
 
         String EVENTS = "play_event";
         String OCCURRED_AT = "occurred_at";

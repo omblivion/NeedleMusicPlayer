@@ -59,10 +59,17 @@ public class MediaStoreFailureTest {
     }
 
     @Test
-    public void successfulEmptyQueryRemovesMissingSongs() {
+    public void emptyProviderQueryWithoutFilesystemEvidenceKeepsMissingSongs() {
         provider.empty = true;
         discography.syncWithMediaStore(progress -> {});
-        assertEquals(0, discography.getAllSongs(null).size());
+        assertEquals(1, discography.getAllSongs(null).size());
+    }
+
+    @Test public void providerRowForTemporarilyMissingFileDoesNotErasePreviousCatalogEntry() {
+        provider.songPath = "/Music/existing.mp3";
+        discography.syncWithMediaStore(progress -> {});
+        assertEquals(42, discography.getSong(42).id);
+        assertEquals("/Music/existing.mp3", discography.getSong(42).data);
     }
 
     @Test
@@ -77,7 +84,7 @@ public class MediaStoreFailureTest {
         provider.songPath = songFile.getPath();
         BlacklistStore.getInstance(RuntimeEnvironment.getApplication()).addPath(music);
         discography.syncWithMediaStore(progress -> {});
-        assertEquals(1, discography.getAllSongs(null).size());
+        assertEquals(2, discography.getAllSongs(null).size());
     }
 
     public static class ScanProvider extends ContentProvider {
@@ -91,7 +98,7 @@ public class MediaStoreFailureTest {
             if (songPath != null) {
                 MatrixCursor cursor = new MatrixCursor(projection);
                 cursor.addRow(new Object[] {99L, "Sibling track", 1, 2024, 1000L, songPath,
-                        0L, 0L, 1L, "Album", "Artist"});
+                        0L, 0L, 1L, "Album", "Artist", 0L, 1L, 1L, "external_primary"});
                 return cursor;
             }
             return empty ? new MatrixCursor(projection) : null;

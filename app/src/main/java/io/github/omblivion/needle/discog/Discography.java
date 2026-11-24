@@ -15,6 +15,7 @@ import io.github.omblivion.needle.model.Artist;
 import io.github.omblivion.needle.model.Genre;
 import io.github.omblivion.needle.model.Song;
 import io.github.omblivion.needle.provider.BlacklistStore;
+import io.github.omblivion.needle.provider.LibraryReferenceStores;
 import io.github.omblivion.needle.sort.SongSortOrder;
 import io.github.omblivion.needle.ui.activities.base.AbsMusicServiceActivity;
 import io.github.omblivion.needle.util.FileUtil;
@@ -47,10 +48,149 @@ public class Discography implements MusicServiceEventListener {
     // TODO wrap this inside the MemCache class
     private final DB database = new DB();
     private final MemCache cache = new MemCache();
+    private long revision;
+    private LibraryScanCoordinator scanCoordinator;
+    private final LibraryRemovalTracker removalTracker = new LibraryRemovalTracker();
+    private ReferenceReconciliationJournal referenceJournal;
+    private boolean journalRecovered;
+    private final Map<String, Integer> metadataAttempts = new HashMap<>();
+    private final Set<String> confirmedDeletedSources = new HashSet<>();
+
+    public void recoverReferences() {
+        if (journalRecovered) return;
+        if (referenceJournal == null) referenceJournal = new ReferenceReconciliationJournal();
+        ReferenceReconciliationJournal.Pending pending = referenceJournal.read();
+        if (pending != null) {
+            Map<Long, Song> previous = new HashMap<>();
+            for (Song song : database.fetchAllSongs()) previous.put(song.id, song);
+            // Resolve the keys actually stored by each store, against the target
+            // catalog, so the recovery matches what a normal publication would do.
+            ReferencePlan plan = LibraryReferenceStores.planFor(pending.snapshot.songs,
+                    pending.snapshot.confirmedDeletedPaths);
+            LibraryReferenceStores.apply(pending.operation, plan, pending.snapshot.songs);
+            database.replaceSongs(pending.snapshot.songs.values());
+            synchronized (cache) {
+                cache.replaceWith(pending.snapshot.prepared);
+                cache.consistencyState = MemCache.ConsistencyState.OK;
+                rememberConfirmedDeletions(pending.snapshot.confirmedDeleted, previous);
+                revision++;
+            }
+            referenceJournal.complete();
+        }
+        journalRecovered = true;
+        notifyDiscographyChanged();
+    }
+
+    boolean hasPendingRemovals() { return removalTracker.hasPending(); }
+
+    public synchronized LibraryScanCoordinator getScanCoordinator() {
+        if (scanCoordinator == null) {
+            scanCoordinator = LibraryScanCoordinator.create(App.getStaticContext(), this);
+        }
+        return scanCoordinator;
+    }
+
+    public synchronized void ensureLoaded() {
+        ReferenceReconciliationJournal.access(() -> {
+            if (getCacheState() == MemCache.ConsistencyState.UNINITIALIZED) fetchAllSongs();
+            return null;
+        });
+    }
+
+    public long getRevision() {
+        synchronized (cache) {
+            return revision;
+        }
+    }
+
+    public void publishSnapshot(@NonNull LibrarySnapshot snapshot) {
+        ReferenceReconciliationJournal.access(() -> {
+        synchronized (cache) {
+            if (snapshot.baseRevision != revision) {
+                throw new IllegalStateException("Obsolete library snapshot");
+            }
+            Map<Long, Song> beforePublication = new HashMap<>(cache.songsById);
+            ReferencePlan plan = LibraryReferenceReconciler.derive(
+                    referenceKeysFromCatalog(beforePublication), snapshot.songs,
+                    snapshot.confirmedDeletedPaths);
+            String operation = null;
+            if (!plan.isEmpty()) {
+                if (referenceJournal == null) referenceJournal = new ReferenceReconciliationJournal();
+                operation = referenceJournal.begin(snapshot);
+                journalRecovered = false;
+            }
+            // Publish first: from here the path is the only truth, and the plan
+            // was computed from the pre-publication catalog.
+            database.replaceSongs(snapshot.songs.values());
+            cache.replaceWith(snapshot.prepared);
+            rememberConfirmedDeletions(snapshot.confirmedDeleted, beforePublication);
+            cache.consistencyState = MemCache.ConsistencyState.OK;
+            revision++;
+            if (operation != null) {
+                ReferenceReconciliationJournal.applyGate.beforeApply();
+                LibraryReferenceStores.apply(operation, plan, snapshot.songs);
+                referenceJournal.complete();
+                journalRecovered = true;
+            }
+        }
+        return null;
+        });
+        notifyDiscographyChanged();
+    }
 
     private final Map<AbsMusicServiceActivity, Handler> attachedActivitiesAndQueue = new HashMap<>();
     private static final String TASK_QUEUE_COALESCENCE_TOKEN = "Discography.triggerSyncWithMediaStore";
-    private final Collection<Runnable> changedListeners = new LinkedList<>();
+    private final Map<Runnable, Handler> changedListeners = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static Set<io.github.omblivion.needle.provider.ReferenceKey> referenceKeysFromCatalog(
+            Map<Long, Song> catalog) {
+        Set<io.github.omblivion.needle.provider.ReferenceKey> keys = new HashSet<>();
+        for (Song song : catalog.values()) {
+            keys.add(new io.github.omblivion.needle.provider.ReferenceKey(song.id, song.data));
+        }
+        return keys;
+    }
+
+    /** Remembers which source a confirmed deletion referred to, never the bare numeric ID. */
+    private void rememberConfirmedDeletions(Set<Long> deletedIds, Map<Long, Song> previous) {        for (Long id : deletedIds) {
+            Song song = previous.get(id);
+            if (song != null) confirmedDeletedSources.add(sourceKey(song));
+        }
+    }
+
+    private static String sourceKey(Song song) {
+        return io.github.omblivion.needle.model.SongSource.canonicalPath(song.data) + "\u0000" + song.id;
+    }
+
+    public Set<Long> getConfirmedDeletedIds() {
+        synchronized (cache) {
+            Set<Long> ids = new HashSet<>();
+            for (Song song : cache.songsById.values()) {
+                if (confirmedDeletedSources.contains(sourceKey(song))) ids.add(song.id);
+            }
+            return ids;
+        }
+    }
+
+    public boolean isConfirmedDeleted(Song song) {
+        synchronized (cache) {
+            return confirmedDeletedSources.contains(sourceKey(song));
+        }
+    }
+
+    public Song resolveReference(Song source) {
+        synchronized (cache) {
+            // The canonical path is the identity: find the catalog entry at this
+            // location and adopt its current provider ID.
+            String path = io.github.omblivion.needle.model.SongSource.canonicalPath(source.data);
+            for (Song song : cache.songsById.values()) {
+                if (io.github.omblivion.needle.model.SongSource.canonicalPath(song.data).equals(path)) {
+                    return new Song(source, song.id);
+                }
+            }
+            return confirmedDeletedSources.contains(sourceKey(source)) ? Song.EMPTY_SONG : source;
+        }
+    }
 
     // TODO This is not a singleton and should not be declared as such
     @NonNull
@@ -67,7 +207,6 @@ public class Discography implements MusicServiceEventListener {
             if (cache.consistencyState == MemCache.ConsistencyState.UNINITIALIZED) {
                 // These operations are IO intensive and may take time, depending on the library size
                 // delay it till UI is availble
-                fetchAllSongs();
                 triggerSyncWithMediaStore(false);
             }
         }
@@ -155,9 +294,8 @@ public class Discography implements MusicServiceEventListener {
         // and while the cache is being filled up,
         // correct and existing songs may be considered as orphan
         // --> incorrectly cleaned from the auxiliary DBs (history, queue, etc)
-        if ((orphanIdsCleaner != null) && (cacheState != MemCache.ConsistencyState.RESETTING)) {
-            orphanIdsCleaner.accept(orphanSongIds);
-        }
+        // Missing from a read snapshot is not proof of deletion. Explicit reconciliation
+        // owns persistent cleanup, including history and playlist references.
         return songs;
     }
 
@@ -348,24 +486,7 @@ public class Discography implements MusicServiceEventListener {
     }
 
     public void triggerSyncWithMediaStore(boolean reset) {
-        // Pick an attached activity
-        if (attachedActivitiesAndQueue.isEmpty()) {throw new IllegalStateException("No attached activity");}
-        final AbsMusicServiceActivity activity = (AbsMusicServiceActivity)attachedActivitiesAndQueue.keySet().toArray()[0];
-        Objects.requireNonNull(activity);
-
-        if (getCacheState() != MemCache.ConsistencyState.OK) {
-            // Prevent reentrance - delay to later
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                final long DELAY = 500L;
-
-                final Handler handler = attachedActivitiesAndQueue.get(activity);
-                Objects.requireNonNull(handler);
-                handler.removeCallbacksAndMessages(TASK_QUEUE_COALESCENCE_TOKEN);
-                handler.postDelayed(() -> triggerSyncWithMediaStore(reset), TASK_QUEUE_COALESCENCE_TOKEN, DELAY);
-            } // else: too bad, just drop the operation. It is unlikely we get there anyway
-        } else {
-            (new SyncWithMediaStoreAsyncTask(activity, this, reset)).execute();
-        }
+        getScanCoordinator().requestScan(new LibraryScanCoordinator.ScanRequest(reset, List.of()));
     }
 
     SyncWithMediaStoreAsyncTask.Progress syncWithMediaStore(@NonNull final Consumer<SyncWithMediaStoreAsyncTask.Progress> progressUpdater) {
@@ -373,14 +494,25 @@ public class Discography implements MusicServiceEventListener {
     }
 
     SyncWithMediaStoreAsyncTask.Progress syncWithMediaStore(@NonNull final Consumer<SyncWithMediaStoreAsyncTask.Progress> progressUpdater, boolean reset) {
+        return syncWithMediaStore(progressUpdater, reset, null, false);
+    }
+
+    SyncWithMediaStoreAsyncTask.Progress syncWithMediaStore(
+            @NonNull final Consumer<SyncWithMediaStoreAsyncTask.Progress> progressUpdater,
+            boolean reset, @Nullable LibraryFileDiscovery.DiscoveryResult discovery,
+            boolean complete) {
         final Context context = App.getInstance().getApplicationContext();
         // A failed query must never be mistaken for an empty library, even on reset.
-        final ArrayList<Song> alienSongs = MediaStoreBridge.getAllSongs(context);
-        if (reset) {
-            synchronized (cache) {
-                clear();
-            }
+        final ArrayList<Song> alienSongs;
+        try {
+            alienSongs = MediaStoreBridge.getAllSongs(context);
+        } catch (RuntimeException failure) {
+            removalTracker.observe(Set.of(), false, 0);
+            throw failure;
         }
+        long baseRevision = getRevision();
+        Map<Long, Song> previous = getAllSongsById();
+        ArrayList<Song> candidate = new ArrayList<>();
 
         // Zombies are tracks that are removed but still indexed by MediaStore
         final Predicate<Song> isZombie = (s) -> !(new File(s.data)).exists();
@@ -406,27 +538,104 @@ public class Discography implements MusicServiceEventListener {
 
         final SyncWithMediaStoreAsyncTask.Progress counters = new SyncWithMediaStoreAsyncTask.Progress();
         final Set<Long> importedSongIds = new HashSet<>();
+        final Set<Long> providerIds = new HashSet<>();
+        final Set<String> providerPaths = new HashSet<>();
+        for (Song song : alienSongs) {
+            providerIds.add(song.id);
+            providerPaths.add(io.github.omblivion.needle.model.SongSource.canonicalPath(song.data));
+        }
         for (final Song song : alienSongs) {
             if (isNotWhiteListed.test(song)) continue;
             if (isBlackListed.test(song)) continue;
             if (isZombie.test(song)) continue;
 
-            final Song matchedSong = getOrAddSong(song, counters);
+            Song existing = previous.get(song.id);
+            Song matchedSong;
+            String versionKey = song.contentUri + "|" + song.data + "|" + song.sourceSize
+                    + "|" + song.sourceGeneration + "|" + song.dateModified + "|" + song.providerVersion;
+            int attempts = reset ? 0 : metadataAttempts.getOrDefault(versionKey, 0);
+            if (!reset && existing != null && (!existing.metadataRetryNeeded || attempts >= 3)
+                    && !io.github.omblivion.needle.model.SongSource.from(song)
+                    .versionChanged(io.github.omblivion.needle.model.SongSource.from(existing))) {
+                matchedSong = new Song(existing);
+            } else {
+                matchedSong = new Song(song);
+                MetadataReadResult metadata = TagExtractor.readTags(matchedSong);
+                matchedSong = metadata.song;
+                if (matchedSong.metadataRetryNeeded) metadataAttempts.put(versionKey, attempts + 1);
+                else metadataAttempts.remove(versionKey);
+                normalizeSong(matchedSong);
+                if (existing == null) counters.added++;
+                else counters.updated++;
+            }
+            candidate.add(matchedSong);
             importedSongIds.add(matchedSong.id);
 
             progressUpdater.accept(counters);
         }
 
-        synchronized (cache) {
-            // Clean orphan songs (removed from MediaStore)
-            final Set<Long> cacheSongsId = new HashSet<>(cache.songsById.keySet()); // make a copy
-            cacheSongsId.removeAll(importedSongIds);
-            removeSongsById(cacheSongsId);
-
-            counters.removed = cacheSongsId.size();
+        Set<Long> absent = new HashSet<>();
+        boolean healthy = complete && discovery != null && discovery.complete;
+        for (Song old : previous.values()) {
+            if (healthy && discovery.covers(old.data) && !providerIds.contains(old.id)
+                    && !providerPaths.contains(io.github.omblivion.needle.model.SongSource.canonicalPath(old.data))
+                    && !discovery.files.containsKey(io.github.omblivion.needle.model.SongSource.canonicalPath(old.data))
+                    && !new File(old.data).exists() && !isNotWhiteListed.test(old)
+                    && !isBlackListed.test(old)) absent.add(old.id);
         }
+        Set<Long> removed = removalTracker.observe(absent, healthy, android.os.SystemClock.elapsedRealtime());
+        Set<String> removedPaths = new HashSet<>();
+        for (Long id : removed) {
+            Song gone = previous.get(id);
+            if (gone != null) {
+                removedPaths.add(io.github.omblivion.needle.model.SongSource.canonicalPath(gone.data));
+            }
+        }
+        for (Song old : previous.values()) {
+            if (importedSongIds.contains(old.id) || removed.contains(old.id)) continue;
+            if (isNotWhiteListed.test(old) || isBlackListed.test(old)) continue;
+            if (confirmedDeletedSources.contains(sourceKey(old))) continue;
+            if (providerPaths.contains(io.github.omblivion.needle.model.SongSource.canonicalPath(old.data))
+                    && !providerIds.contains(old.id)) {
+                // Provider still lists this path under a changed ID that was not imported
+                // (for example the file is temporarily inaccessible): keep the last entry.
+            } else if (providerPaths.contains(io.github.omblivion.needle.model.SongSource.canonicalPath(old.data))) {
+                continue;
+            }
+            candidate.add(new Song(old));
+        }
+        counters.removed = removed.size();
+        publishSnapshot(new LibrarySnapshot(candidate, baseRevision, removed, removedPaths));
 
         return counters;
+    }
+
+    boolean hasMetadataRetries() {
+        for (int attempts : metadataAttempts.values()) if (attempts > 0 && attempts < 3) return true;
+        return false;
+    }
+
+    private static void normalizeSong(Song song) {
+        song.title = StringUtil.unicodeNormalize(song.title);
+        song.albumName = StringUtil.unicodeNormalize(song.albumName);
+        song.artistNames = normalizeNames(song.artistNames);
+        song.albumArtistNames = normalizeNames(song.albumArtistNames);
+        ArrayList<String> genres = new ArrayList<>();
+        for (String genre : song.genres) {
+            try {
+                String name = GenreTypes.getInstanceOf().getValueForId(Integer.parseInt(genre));
+                if (name != null) genres.add(name);
+            } catch (NumberFormatException textualGenre) {
+                genres.add(StringUtil.unicodeNormalize(genre));
+            }
+        }
+        song.genres = genres;
+    }
+
+    private static List<String> normalizeNames(List<String> names) {
+        ArrayList<String> normalized = new ArrayList<>();
+        for (String name : names) normalized.add(StringUtil.unicodeNormalize(name));
+        return normalized;
     }
 
     private static boolean isInDirectory(String filePath, String directoryPath) {
@@ -463,40 +672,58 @@ public class Discography implements MusicServiceEventListener {
     }
 
     public void addChangedListener(Runnable listener) {
-        changedListeners.add(listener);
+        changedListeners.put(listener, new Handler(android.os.Looper.getMainLooper()));
     }
 
     public void removeChangedListener(Runnable listener) {
-        attachedActivitiesAndQueue.forEach((activity, handler) -> handler.removeCallbacks(listener));
-        changedListeners.remove(listener);
+        Handler handler = changedListeners.remove(listener);
+        if (handler != null) handler.removeCallbacks(listener);
     }
 
     private void notifyDiscographyChanged() {
         // Notify the attached activiies to reload the UI content
         // Since this can be called from a background thread, make it safe by wrapping as an event to main thread
-        attachedActivitiesAndQueue.forEach((activity, handler) -> {
-            // Post as much 1 event per a coalescence period
-            final long COALESCENCE_DELAY = 200L;
-            for (final Runnable listener : changedListeners) {
-                handler.removeCallbacks(listener);
-                handler.postDelayed(listener, COALESCENCE_DELAY);
-            }
+        changedListeners.forEach((listener, handler) -> {
+            handler.removeCallbacks(listener);
+            handler.postDelayed(listener, 200L);
         });
     }
 
     public void removeSongByPath(@NonNull String... paths) {
         synchronized (cache) {
-            ArrayList<Long> matchingSongIds = new ArrayList<>();
             for (String path : paths) {
                 for (Song song : cache.songsById.values()) {
                     if (song.data.equals(path)) {
-                        matchingSongIds.add(song.id);
-                        break;
+                        // Tag edits invalidate derived metadata, not logical membership.
+                        song.metadataRetryNeeded = true;
                     }
                 }
             }
-            removeSongsById(matchingSongIds);
         }
+    }
+
+    public void confirmDeletion(@NonNull Collection<Song> songs) {
+        ReferenceReconciliationJournal.access(() -> {
+            synchronized (cache) {
+                Map<Long, Song> remaining = new HashMap<>(cache.songsById);
+                Set<Long> deleted = new HashSet<>();
+                Set<String> deletedPaths = new HashSet<>();
+                for (Song song : songs) {
+                    Song current = remaining.get(song.id);
+                    if (current != null && io.github.omblivion.needle.model.SongSource
+                            .canonicalPath(current.data).equals(io.github.omblivion.needle.model.SongSource
+                                    .canonicalPath(song.data))) {
+                        remaining.remove(song.id);
+                        deleted.add(song.id);
+                        deletedPaths.add(io.github.omblivion.needle.model.SongSource
+                                .canonicalPath(song.data));
+                    }
+                }
+                rememberConfirmedDeletions(deleted, cache.songsById);
+                publishSnapshot(new LibrarySnapshot(remaining.values(), revision, deleted, deletedPaths));
+            }
+            return null;
+        });
     }
 
     private void removeSongById(final long songId) {

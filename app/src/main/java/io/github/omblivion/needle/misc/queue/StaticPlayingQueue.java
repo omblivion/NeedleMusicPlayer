@@ -11,6 +11,75 @@ import java.util.Collection;
 import java.util.List;
 
 public class StaticPlayingQueue {
+    public void reconcileSources(java.util.Map<Long, Song> catalog, java.util.Set<Long> deleted,
+            boolean updateMetadata) {
+        java.util.Map<String, Song> byPath = new java.util.HashMap<>();
+        java.util.Set<String> ambiguous = new java.util.HashSet<>();
+        for (Song song : catalog.values()) {
+            String path = io.github.omblivion.needle.model.SongSource.canonicalPath(song.data);
+            if (byPath.put(path, song) != null) ambiguous.add(path);
+        }
+        boolean[] gone = new boolean[queue.size()];
+        for (int i = 0; i < queue.size(); i++) {
+            gone[i] = deleted.contains(queue.get(i).id);
+        }
+        // Renumber both lists together so saved indexes stay valid after removal.
+        removeGoneSongs(gone);
+        reindex();
+        for (ArrayList<IndexedSong> list : java.util.List.of(queue, originalQueue)) {
+            for (int i = 0; i < list.size(); i++) {
+                IndexedSong old = list.get(i);
+                String path = io.github.omblivion.needle.model.SongSource.canonicalPath(old.data);
+                // The canonical path is the track: resolve by path, never by ID,
+                // so a recycled ID cannot relabel this queue entry.
+                Song fresh = ambiguous.contains(path) ? null : byPath.get(path);
+                if (fresh != null && (updateMetadata || fresh.id != old.id || !fresh.data.equals(old.data))) {
+                    list.set(i, new IndexedSong(fresh, old.index, old.getUniqueId()));
+                }
+            }
+        }
+    }
+
+    private void removeGoneSongs(boolean[] gone) {
+        int oldPosition = currentPosition;
+        for (int i = queue.size() - 1; i >= 0; i--) {
+            if (!gone[i]) continue;
+            queue.remove(i);
+            originalQueue.remove(i);
+        }
+        int newPosition = 0;
+        boolean positionTracked = false;
+        int kept = 0;
+        for (int i = 0; i < gone.length; i++) {
+            if (gone[i]) continue;
+            if (i == oldPosition) {
+                newPosition = kept;
+                positionTracked = true;
+                break;
+            }
+            kept++;
+        }
+        if (queue.isEmpty()) {
+            currentPosition = INVALID_POSITION;
+        } else if (positionTracked) {
+            currentPosition = Math.min(newPosition, queue.size() - 1);
+        } else {
+            currentPosition = Math.min(Math.max(oldPosition, 0), queue.size() - 1);
+        }
+        if (nextPosition != INVALID_POSITION) {
+            nextPosition = Math.min(nextPosition, queue.size() - 1);
+        }
+    }
+
+    private void reindex() {
+        for (int i = 0; i < queue.size(); i++) {
+            queue.get(i).index = i;
+            originalQueue.get(i).index = i;
+        }
+        if (nextPosition != INVALID_POSITION) {
+            nextPosition = Math.min(nextPosition, queue.size() - 1);
+        }
+    }
 
     public static final int REPEAT_MODE_NONE = 0;
     public static final int REPEAT_MODE_ALL = 1;
@@ -52,11 +121,14 @@ public class StaticPlayingQueue {
             throw new IllegalArgumentException("Queue size=" + queueSize + " vs position=" + restoredPosition);
         }
         boolean[] restoredIndexes = new boolean[queueSize];
-        for (IndexedSong song : restoreQueue) {
+        int firstMissing = -1;
+        for (int i = 0; i < queueSize; i++) {
+            IndexedSong song = restoreQueue.get(i);
             if (song.index < 0 || song.index >= queueSize || restoredIndexes[song.index]) {
                 throw new IllegalArgumentException("Invalid restored queue index=" + song.index);
             }
             restoredIndexes[song.index] = true;
+            if (song.id == Song.EMPTY_SONG.id && firstMissing < 0) firstMissing = i;
         }
 
         this.queue = copyQueue(restoreQueue);
@@ -64,17 +136,29 @@ public class StaticPlayingQueue {
         this.shuffleMode = shuffleMode;
         this.repeatMode = repeatMode;
 
+        // Entries whose source could not be resolved stay in the list as
+        // placeholders; callers drop them together once the catalog is loaded.
+        // Until then, point the current position at a survivor so the queue is
+        // usable and positions stay valid.
         currentPosition = queueSize == 0 ? INVALID_POSITION : restoredPosition;
-
-        // Adjust for removed songs, marked with Song.EMPTY in the restored queues
-        // See MusicPlaybackQueueStore.getSongPosition
-        for (int i = queueSize - 1; i >= 0; --i) {
-            if (restoreQueue.get(i).id == Song.EMPTY_SONG.id) {
-                remove(i);
-            }
+        if (firstMissing >= 0 && currentPosition == firstMissing) {
+            currentPosition = queueSize == 1 ? INVALID_POSITION : Math.max(firstMissing - 1, 0);
         }
-
         restoreUniqueId();
+    }
+
+    /**
+     * Drops restored entries whose source could not be verified, then renumbers
+     * both lists together so the saved indexes stay valid and the current
+     * position keeps pointing at the same occurrence when possible.
+     */
+    public void dropUnresolvedEntries() {
+        boolean[] gone = new boolean[queue.size()];
+        for (int i = 0; i < queue.size(); i++) {
+            gone[i] = queue.get(i).id == Song.EMPTY_SONG.id;
+        }
+        removeGoneSongs(gone);
+        reindex();
     }
 
     public void restoreMode(int shuffleMode, int repeatMode) {

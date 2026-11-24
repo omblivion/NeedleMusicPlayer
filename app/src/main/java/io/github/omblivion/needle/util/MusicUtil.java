@@ -339,7 +339,8 @@ public class MusicUtil {
     public static boolean isFavorite(@NonNull final Context context, @NonNull final Song song) {
         Playlist playlist = getFavoritesPlaylist(context);
         if (playlist == null) {return false;}
-        return PlaylistsUtil.doesPlaylistContain(playlist.id, song.id);
+        Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
+        return PlaylistsUtil.doesPlaylistContain(playlist.id, logical.id);
     }
 
     public static void toggleFavorite(@NonNull final Context context, @NonNull final Song song) {

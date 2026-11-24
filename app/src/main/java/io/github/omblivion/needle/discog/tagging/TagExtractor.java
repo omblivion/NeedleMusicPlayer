@@ -7,6 +7,8 @@ import androidx.annotation.NonNull;
 import io.github.omblivion.needle.App;
 import io.github.omblivion.needle.R;
 import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.discog.MetadataReadResult;
+import io.github.omblivion.needle.service.PlaybackSourceResolver;
 import io.github.omblivion.needle.util.AutoCloseAudioFile;
 import io.github.omblivion.needle.util.OopsHandler;
 import io.github.omblivion.needle.util.SAFUtil;
@@ -56,12 +58,25 @@ public class TagExtractor {
     };
 
     public static void extractTags(@NonNull Song song) {
+        readInto(song);
+    }
+
+    public static MetadataReadResult readTags(@NonNull Song source) {
+        PlaybackSourceResolver.Resolution verified =
+                PlaybackSourceResolver.resolve(App.getStaticContext(), source);
+        if (verified.status != PlaybackSourceResolver.Status.VERIFIED) {
+            return new MetadataReadResult(MetadataReadResult.Status.RETRYABLE_FAILURE, source);
+        }
+        return MetadataReadResult.readStable(verified.song, TagExtractor::readInto);
+    }
+
+    private static MetadataReadResult.Status readInto(@NonNull Song song) {
         final Context context = App.getStaticContext();
         try (AutoCloseAudioFile audio = SAFUtil.loadReadOnlyAudioFile(context, song)){
             if (audio == null) {
                 // Cannot get the audio content
                 SafeToast.show(context, context.getString(R.string.saf_read_failed, song.data));
-                return;
+                return MetadataReadResult.Status.RETRYABLE_FAILURE;
             }
             // Override with metadata extracted from the file ourselves
             final AudioFile file = audio.get();
@@ -93,8 +108,12 @@ public class TagExtractor {
             song.replayGainTrack = rgValues.track;
             song.replayGainPeakAlbum = rgValues.peakAlbum;
             song.replayGainPeakTrack = rgValues.peakTrack;
+            return MetadataReadResult.Status.SUCCESS;
+        } catch (UnsupportedOperationException unsupported) {
+            return MetadataReadResult.Status.UNSUPPORTED;
         } catch (@NonNull Exception | NoSuchMethodError | VerifyError e) {
             OopsHandler.collectStackTrace(e);
+            return MetadataReadResult.Status.RETRYABLE_FAILURE;
         }
     }
 }

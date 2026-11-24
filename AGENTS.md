@@ -148,6 +148,35 @@ Lint XML: `app/build/reports/lint-results-<variant>.xml`; count
   invalid value).
 - This is a `SQLiteOpenHelper`-based app (no Room). Keep the current
   architecture unless a task says otherwise.
+- Library import: `discog/LibraryScanCoordinator.java` serializes recursive
+  discovery, MediaScanner callbacks and catalog reconciliation. Automatic
+  refresh is incremental; explicit rescanning re-extracts derived metadata.
+  `LibraryFileDiscovery` tracks incomplete enumeration; absence alone is not
+  deletion evidence.
+- Catalog schema v8 and queue schema v8 preserve source locators/versions.
+  `SongSource` distinguishes locator/version changes and verified provider-row
+  continuity; metadata similarity must not establish identity.
+- References are path-anchored: `provider/ReferenceKey.java` is an `id:path`
+  value, `HistoryStore` and `SongPlayCountStore` carry a `path` column, and
+  playlist preferences store `id:path` tokens. `SongSource.sameTrack` is the
+  single identity rule; `versionChanged` only invalidates caches and preloads.
+- Reconciliation resolves each stored path against the published catalog
+  (`LibraryReferenceReconciler.derive`). There is no ID mapping, no sentinel, and
+  no similarity match: an absent path leaves the reference untouched. Never add
+  a numeric-ID fallback when resolving a reference — it lets a recycled provider
+  ID claim another track's data.
+- `ReferenceReconciliationJournal` holds the operation marker and gate;
+  recovery recomputes the plan from the keys actually stored by each store
+  (`LibraryReferenceStores.planFor`), so a replay matches a normal publication.
+- Reference reconciliation spans separate SQLite databases and SharedPreferences.
+  `ReferenceReconciliationJournal` supplies the access gate and crash-recovery
+  intent; `provider/LibraryReferenceStores` applies store-local replay markers.
+  Reads must not prune unresolved playlist/history IDs. Confirmed deletion
+  cleanup goes through `Discography.confirmDeletion()`; tag edits only invalidate
+  derived metadata.
+- Catalog publication is staged (`LibrarySnapshot`) and notifies listeners only
+  after commit, including listeners without an attached activity. Keep file/tag
+  I/O off the publication lock and UI thread.
 
 ## Release process
 

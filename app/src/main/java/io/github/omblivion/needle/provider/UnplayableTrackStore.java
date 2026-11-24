@@ -51,6 +51,13 @@ public class UnplayableTrackStore extends SQLiteOpenHelper {
     }
 
     public void recordFailure(@NonNull Song song) {
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            recordFailureInternal(song);
+            return null;
+        });
+    }
+
+    private void recordFailureInternal(Song song) {
         if (song.id < 0 || song.data.isEmpty()) return;
         ContentValues values = new ContentValues();
         values.put("uri", MusicUtil.getSongFileUri(song.id).toString());
@@ -73,6 +80,10 @@ public class UnplayableTrackStore extends SQLiteOpenHelper {
 
     @NonNull
     public ArrayList<Song> getSongs() {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(this::getSongsInternal);
+    }
+
+    private ArrayList<Song> getSongsInternal() {
         ArrayList<Song> songs = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().query("reports",
                 new String[]{"song_id", "title", "track_number", "year", "duration", "path",
@@ -95,6 +106,10 @@ public class UnplayableTrackStore extends SQLiteOpenHelper {
     }
 
     public boolean contains(@NonNull Song song) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> containsInternal(song));
+    }
+
+    private boolean containsInternal(Song song) {
         try (Cursor cursor = getReadableDatabase().query("reports", new String[]{"song_id"},
                 "song_id = ? AND path = ?", new String[]{Long.toString(song.id), song.data},
                 null, null, null)) {
@@ -103,6 +118,10 @@ public class UnplayableTrackStore extends SQLiteOpenHelper {
     }
 
     public boolean remove(@NonNull Song song) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> removeInternal(song));
+    }
+
+    private boolean removeInternal(Song song) {
         boolean removed = getWritableDatabase().delete("reports", "song_id = ? AND path = ?",
                 new String[]{Long.toString(song.id), song.data}) > 0;
         if (removed) notifyChanged();
