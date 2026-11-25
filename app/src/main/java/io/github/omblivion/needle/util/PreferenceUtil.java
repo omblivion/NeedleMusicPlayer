@@ -710,6 +710,11 @@ public final class PreferenceUtil {
         return new File(mPreferences.getString(START_DIRECTORY, FoldersFragment.getDefaultStartDirectory().getPath()));
     }
 
+    /** The configured value, without filesystem access or default-directory probing. */
+    public String getLibraryRootSetting() {
+        return mPreferences.getString(START_DIRECTORY, "");
+    }
+
     public void setStartDirectory(final File file) {
         mPreferences.edit()
                 .putString(START_DIRECTORY, FileUtil.safeGetCanonicalPath(file))

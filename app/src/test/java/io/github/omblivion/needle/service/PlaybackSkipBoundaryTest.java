@@ -31,10 +31,10 @@ public class PlaybackSkipBoundaryTest {
             }
         }
 
-        @Override boolean openTrackAndPrepareNextAt(int position) {
+        @Override OpenResult openTrackAndPrepareNextAt(int position) {
             openedPositions.add(position);
             setPositionForTest(position);
-            return !failingUris.contains(trackUriAtForTest(position));
+            return failingUris.contains(trackUriAtForTest(position)) ? OpenResult.PLAYER_FAILED : OpenResult.OPENED;
         }
 
         @Override public void play() {

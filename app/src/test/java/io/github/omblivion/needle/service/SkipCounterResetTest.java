@@ -23,10 +23,10 @@ public class SkipCounterResetTest {
             return reportedProgressMillis;
         }
 
-        @Override boolean openTrackAndPrepareNextAt(int position) {
+        @Override OpenResult openTrackAndPrepareNextAt(int position) {
             resetConsecutiveSkipsIfPlayed();
             setPositionForTest(position);
-            return true;
+            return OpenResult.OPENED;
         }
 
         @Override public void play() {

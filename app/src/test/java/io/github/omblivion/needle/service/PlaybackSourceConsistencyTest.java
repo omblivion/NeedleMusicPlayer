@@ -42,6 +42,29 @@ public class PlaybackSourceConsistencyTest {
         assertNull(player.openedUri);
     }
 
+    @Test public void temporaryProviderFailureDoesNotCreateAnUnplayableReport() {
+        SourceProvider provider = new SourceProvider();
+        provider.path = "/Music/a.mp3";
+        provider.fail = true;
+        ShadowContentResolver.registerProviderInternal("media", provider);
+        MusicService service = Robolectric.buildService(QuietService.class).get();
+        ProbePlayback player = new ProbePlayback();
+        ReflectionHelpers.setField(service, "playback", player);
+        setQueue(service, expected());
+        service.playSongAtImpl(0);
+        assertNull(player.openedUri);
+        assertFalse(io.github.omblivion.needle.provider.UnplayableTrackStore
+                .getInstance(RuntimeEnvironment.getApplication()).contains(expected()));
+        provider.fail = false;
+        service.playSongAtImpl(0);
+        assertNotNull(player.openedUri);
+    }
+
+    public static class QuietService extends MusicService {
+        @Override void notifyChange(String what) {}
+        @Override public void play() {}
+    }
+
     @Test
     public void replacingQueueMetadataDoesNotRelabelAlreadyOpenedAudio() {
         SourceProvider provider = new SourceProvider();
@@ -124,7 +147,7 @@ public class PlaybackSourceConsistencyTest {
         assertEquals(99, result.song.id);
     }
 
-    @Test public void samePathChangedVersionIsNotOpenedWithStaleMetadata() {
+    @Test public void samePathWithNewlyKnownSizeOpensUsingTheVerifiedSource() {
         Song expected = expected();
         expected.sourceSize = -1;
         SourceProvider provider = new SourceProvider();
@@ -132,8 +155,9 @@ public class PlaybackSourceConsistencyTest {
         provider.directMissing = true;
         provider.size = 999;
         ShadowContentResolver.registerProviderInternal("media", provider);
-        assertEquals(PlaybackSourceResolver.Status.UNAVAILABLE,
-                PlaybackSourceResolver.resolve(RuntimeEnvironment.getApplication(), expected).status);
+        var resolved = PlaybackSourceResolver.resolve(RuntimeEnvironment.getApplication(), expected);
+        assertEquals(PlaybackSourceResolver.Status.VERIFIED, resolved.status);
+        assertEquals(999, resolved.song.sourceSize);
     }
 
     @Test

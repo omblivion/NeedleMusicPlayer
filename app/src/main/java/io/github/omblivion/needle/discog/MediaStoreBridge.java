@@ -24,7 +24,6 @@ import java.util.Map;
  */
 
 public class MediaStoreBridge {
-    private static final String BASE_SELECTION = MediaStore.Audio.AudioColumns.IS_MUSIC + "=1";
     private static final String[] BASE_PROJECTION = new String[]{
             BaseColumns._ID,
             MediaStore.Audio.AudioColumns.TITLE,
@@ -59,7 +58,10 @@ public class MediaStoreBridge {
         Map<String, String> versions = new HashMap<>();
         if (cursor != null && cursor.moveToFirst()) {
             do {
-                Song song = getSongFromCursorImpl(cursor);
+                String path = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA));
+                // Some provider rows are inaccessible or have no filesystem locator.
+                if (path == null || path.isEmpty()) continue;
+                Song song = getSongFromCursorImpl(cursor, path);
                 String volume = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.VOLUME_NAME));
                 if (volume != null && !volume.isEmpty()) {
                     song.providerVersion = versions.computeIfAbsent(volume, v -> {
@@ -79,7 +81,7 @@ public class MediaStoreBridge {
     }
 
     @NonNull
-    private static Song getSongFromCursorImpl(@NonNull Cursor cursor) {
+    private static Song getSongFromCursorImpl(@NonNull Cursor cursor, @NonNull String data) {
         // Most of the time data imported from these columns are overriden by those extracted ourselves from ID3 tags
         // However, in the case extraction fails (unsupported track format), they serve as fallback values
         final long id = cursor.getLong(cursor.getColumnIndexOrThrow(BaseColumns._ID));
@@ -87,8 +89,6 @@ public class MediaStoreBridge {
         final int trackNumber = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.TRACK));
         final int year = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.YEAR));
         final long duration = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.DURATION));
-        final String data = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.DATA));
-        if (data == null || data.isEmpty()) throw new IllegalStateException("MediaStore row has no path");
         if (title == null || title.trim().isEmpty()) title = new java.io.File(data).getName();
         final long dateAdded = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.DATE_ADDED));
         final long dateModified = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.DATE_MODIFIED));
@@ -121,7 +121,7 @@ public class MediaStoreBridge {
         return context.getContentResolver().query(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     BASE_PROJECTION,
-                    BASE_SELECTION,
+                     null,
                     null,
                     PreferenceUtil.getInstance().getSongSortOrder()
         );

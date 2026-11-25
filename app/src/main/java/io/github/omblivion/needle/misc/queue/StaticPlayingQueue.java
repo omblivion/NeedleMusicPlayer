@@ -19,20 +19,23 @@ public class StaticPlayingQueue {
             String path = io.github.omblivion.needle.model.SongSource.canonicalPath(song.data);
             if (byPath.put(path, song) != null) ambiguous.add(path);
         }
+        for (String path : ambiguous) byPath.remove(path);
+        reconcileSourcesByPath(byPath, song -> deleted.contains(song.id), updateMetadata);
+    }
+
+    public void reconcileSourcesByPath(java.util.Map<String, Song> byPath,
+            java.util.function.Predicate<Song> deleted, boolean updateMetadata) {
         boolean[] gone = new boolean[queue.size()];
         for (int i = 0; i < queue.size(); i++) {
-            gone[i] = deleted.contains(queue.get(i).id);
+            gone[i] = deleted.test(queue.get(i));
         }
-        // Renumber both lists together so saved indexes stay valid after removal.
         removeGoneSongs(gone);
-        reindex();
         for (ArrayList<IndexedSong> list : java.util.List.of(queue, originalQueue)) {
             for (int i = 0; i < list.size(); i++) {
                 IndexedSong old = list.get(i);
-                String path = io.github.omblivion.needle.model.SongSource.canonicalPath(old.data);
                 // The canonical path is the track: resolve by path, never by ID,
                 // so a recycled ID cannot relabel this queue entry.
-                Song fresh = ambiguous.contains(path) ? null : byPath.get(path);
+                Song fresh = byPath.get(old.getCanonicalCatalogPath());
                 if (fresh != null && (updateMetadata || fresh.id != old.id || !fresh.data.equals(old.data))) {
                     list.set(i, new IndexedSong(fresh, old.index, old.getUniqueId()));
                 }
@@ -41,43 +44,42 @@ public class StaticPlayingQueue {
     }
 
     private void removeGoneSongs(boolean[] gone) {
-        int oldPosition = currentPosition;
-        for (int i = queue.size() - 1; i >= 0; i--) {
-            if (!gone[i]) continue;
-            queue.remove(i);
-            originalQueue.remove(i);
-        }
-        int newPosition = 0;
-        boolean positionTracked = false;
-        int kept = 0;
+        boolean[] originalGone = new boolean[gone.length];
+        int removedBeforeCurrent = 0;
+        int removedBeforeNext = 0;
+        boolean anyGone = false;
         for (int i = 0; i < gone.length; i++) {
-            if (gone[i]) continue;
-            if (i == oldPosition) {
-                newPosition = kept;
-                positionTracked = true;
-                break;
+            if (gone[i]) {
+                anyGone = true;
+                originalGone[queue.get(i).index] = true;
+                if (i < currentPosition) removedBeforeCurrent++;
+                if (i < nextPosition) removedBeforeNext++;
             }
-            kept++;
         }
+        if (!anyGone) return;
+
+        // queue.index points into the unshuffled order, not the playback order.
+        int[] originalIndexes = new int[gone.length];
+        int nextIndex = 0;
+        for (int i = 0; i < originalGone.length; i++) {
+            if (!originalGone[i]) {
+                originalIndexes[i] = nextIndex;
+                originalQueue.get(i).index = nextIndex++;
+            }
+        }
+        for (int i = gone.length - 1; i >= 0; i--) {
+            if (originalGone[i]) originalQueue.remove(i);
+            if (gone[i]) queue.remove(i);
+            else queue.get(i).index = originalIndexes[queue.get(i).index];
+        }
+
         if (queue.isEmpty()) {
             currentPosition = INVALID_POSITION;
-        } else if (positionTracked) {
-            currentPosition = Math.min(newPosition, queue.size() - 1);
         } else {
-            currentPosition = Math.min(Math.max(oldPosition, 0), queue.size() - 1);
+            currentPosition = Math.min(Math.max(currentPosition - removedBeforeCurrent, 0), queue.size() - 1);
         }
         if (nextPosition != INVALID_POSITION) {
-            nextPosition = Math.min(nextPosition, queue.size() - 1);
-        }
-    }
-
-    private void reindex() {
-        for (int i = 0; i < queue.size(); i++) {
-            queue.get(i).index = i;
-            originalQueue.get(i).index = i;
-        }
-        if (nextPosition != INVALID_POSITION) {
-            nextPosition = Math.min(nextPosition, queue.size() - 1);
+            nextPosition = gone[nextPosition] ? INVALID_POSITION : nextPosition - removedBeforeNext;
         }
     }
 
@@ -158,7 +160,6 @@ public class StaticPlayingQueue {
             gone[i] = queue.get(i).id == Song.EMPTY_SONG.id;
         }
         removeGoneSongs(gone);
-        reindex();
     }
 
     public void restoreMode(int shuffleMode, int repeatMode) {

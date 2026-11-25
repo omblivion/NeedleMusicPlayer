@@ -2,8 +2,9 @@ package io.github.omblivion.needle.service;
 
 import androidx.annotation.NonNull;
 
-import io.github.omblivion.needle.helper.StopWatch;
+import android.os.SystemClock;
 import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.provider.ReferenceKey;
 import io.github.omblivion.needle.provider.SongPlayCountStore;
 
 import java.util.UUID;
@@ -11,7 +12,8 @@ import java.util.UUID;
 class SongPlayCountHelper {
     public static final String TAG = io.github.omblivion.needle.service.SongPlayCountHelper.class.getSimpleName();
 
-    private final StopWatch stopWatch = new StopWatch();
+    private long elapsed;
+    private long startedAt = -1;
     private Song song = Song.EMPTY_SONG;
 
     // Captured when tracking begins for a new song: a unique occurrence token
@@ -26,11 +28,15 @@ class SongPlayCountHelper {
     }
 
     public long getElapsedTime() {
-        return stopWatch.getElapsedTime();
+        return getElapsedTime(SystemClock.elapsedRealtime());
+    }
+
+    synchronized long getElapsedTime(long at) {
+        return elapsed + (startedAt < 0 ? 0 : Math.max(0, at - startedAt));
     }
 
     boolean shouldBumpPlayCount() {
-        return shouldBumpPlayCount(stopWatch.getElapsedTime());
+        return shouldBumpPlayCount(getElapsedTime());
     }
 
     boolean shouldBumpPlayCount(long elapsedMs) {
@@ -39,20 +45,26 @@ class SongPlayCountHelper {
 
     void notifySongChanged(@NonNull Song song, @NonNull SongPlayCountStore store) {
         synchronized (this) {
-            stopWatch.reset();
+            elapsed = 0;
+            startedAt = -1;
             this.song = song;
             this.occurrence = UUID.randomUUID().toString();
-            this.resetVersion = store.getResetVersion(song.id);
+            this.resetVersion = store.getResetVersion(ReferenceKey.of(song));
             this.committed = false;
         }
     }
 
     void notifyPlayStateChanged(boolean isPlaying) {
+        notifyPlayStateChanged(isPlaying, SystemClock.elapsedRealtime());
+    }
+
+    void notifyPlayStateChanged(boolean isPlaying, long at) {
         synchronized (this) {
-            if (isPlaying) {
-                stopWatch.start();
-            } else {
-                stopWatch.pause();
+            if (isPlaying && startedAt < 0) {
+                startedAt = at;
+            } else if (!isPlaying && startedAt >= 0) {
+                elapsed = getElapsedTime(at);
+                startedAt = -1;
             }
         }
     }
@@ -73,7 +85,7 @@ class SongPlayCountHelper {
             committed = true;
             Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
             if (logical.id == Song.EMPTY_SONG.id) return false;
-            store.recordPlay(logical.id, System.currentTimeMillis(), occurrence, resetVersion);
+            store.recordPlay(ReferenceKey.of(logical), System.currentTimeMillis(), occurrence, resetVersion);
             return true;
             });
         }

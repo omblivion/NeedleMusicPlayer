@@ -2,12 +2,13 @@ package io.github.omblivion.needle.discog;
 
 import android.content.Context;
 import android.media.MediaScannerConnection;
-import android.os.Environment;
 import android.os.FileObserver;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import io.github.omblivion.needle.provider.BlacklistStore;
+import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.model.SongSource;
 import io.github.omblivion.needle.util.PreferenceUtil;
 import java.io.File;
 import java.util.ArrayList;
@@ -27,7 +28,7 @@ public final class LibraryScanCoordinator {
         public final List<File> roots;
         public ScanRequest(boolean forceRebuild, List<File> roots) {
             this.forceRebuild = forceRebuild;
-            this.roots = new ArrayList<>(roots);
+            this.roots = List.copyOf(roots);
         }
         ScanRequest merge(ScanRequest other) {
             Set<File> combined = new LinkedHashSet<>(roots);
@@ -47,7 +48,8 @@ public final class LibraryScanCoordinator {
     private final Backend backend;
     private final Executor worker;
     private final Scheduler scheduler;
-    private ScanRequest pending;
+    private ScanRequest pendingLibrary;
+    private ScanRequest pendingTargeted;
     private boolean running;
 
     LibraryScanCoordinator(Backend backend, Executor worker, Scheduler scheduler) {
@@ -68,7 +70,11 @@ public final class LibraryScanCoordinator {
 
     public synchronized void requestScan(ScanRequest request) {
         if (running) {
-            pending = pending == null ? request : pending.merge(request);
+            if (request.roots.isEmpty()) {
+                pendingLibrary = pendingLibrary == null ? request : pendingLibrary.merge(request);
+            } else {
+                pendingTargeted = pendingTargeted == null ? request : pendingTargeted.merge(request);
+            }
             return;
         }
         running = true;
@@ -132,9 +138,13 @@ public final class LibraryScanCoordinator {
 
     private synchronized void finish() {
         running = false;
-        if (pending != null) {
-            ScanRequest next = pending;
-            pending = null;
+        if (pendingLibrary != null) {
+            ScanRequest next = pendingLibrary;
+            pendingLibrary = null;
+            requestScan(next);
+        } else if (pendingTargeted != null) {
+            ScanRequest next = pendingTargeted;
+            pendingTargeted = null;
             requestScan(next);
         }
     }
@@ -145,8 +155,10 @@ public final class LibraryScanCoordinator {
         final Handler handler;
         final Runnable rescan;
         final Map<String, LibraryFileDiscovery.Observation> previous = new HashMap<>();
-        final List<FileObserver> observers = new ArrayList<>();
+        final Map<File, FileObserver> observers = new HashMap<>();
         LibraryFileDiscovery.DiscoveryResult discovery;
+        String selectedRoot;
+        String rootSetting;
 
         AndroidBackend(Context context, Discography discography, Handler handler) {
             this.context = context.getApplicationContext();
@@ -158,23 +170,40 @@ public final class LibraryScanCoordinator {
         @Override public List<String> discover(ScanRequest request) {
             discography.ensureLoaded();
             List<File> roots = request.roots;
-            if (roots.isEmpty()) roots = List.of(PreferenceUtil.getInstance().getWhitelistEnabled()
-                    ? PreferenceUtil.getInstance().getStartDirectory()
-                    : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC));
+            PreferenceUtil preferences = PreferenceUtil.getInstance();
+            rootSetting = preferences.getLibraryRootSetting();
+            File configured = preferences.getStartDirectory();
+            selectedRoot = SongSource.canonicalPath(configured.getPath());
+            if (roots.isEmpty()) roots = List.of(configured);
+            else roots = roots.stream().filter(file -> LibraryFileDiscovery.inDirectory(
+                    file.getPath(), selectedRoot)).toList();
             discovery = new LibraryFileDiscovery(BlacklistStore.getInstance(context).getPaths()).discover(roots);
+            if (roots.isEmpty()) discovery.complete = false;
             List<String> paths = new ArrayList<>();
-            Set<String> catalogPaths = new HashSet<>();
-            for (io.github.omblivion.needle.model.Song song : discography.getAllSongs(null)) {
-                catalogPaths.add(io.github.omblivion.needle.model.SongSource.canonicalPath(song.data));
+            Map<String, Song> catalog = new HashMap<>();
+            for (Song song : discography.getAllSongs(null)) {
+                catalog.put(SongSource.canonicalPath(song.data), song);
             }
             for (Map.Entry<String, LibraryFileDiscovery.Observation> entry : discovery.files.entrySet()) {
-                if (request.forceRebuild || !catalogPaths.contains(entry.getKey())
-                        || !entry.getValue().sameVersion(previous.get(entry.getKey()))) paths.add(entry.getKey());
+                var last = previous.get(entry.getKey());
+                Song existing = catalog.get(entry.getKey());
+                if (request.forceRebuild || existing == null
+                        || (last == null ? !entry.getValue().matches(existing)
+                                         : !entry.getValue().sameVersion(last))) paths.add(entry.getKey());
             }
-            for (FileObserver observer : observers) observer.stopWatching();
-            observers.clear();
-            for (File directory : discovery.directories) {
-                FileObserver observer = new FileObserver(directory,
+            if (request.roots.isEmpty() && discovery.complete) updateObservers(discovery.directories);
+            return paths;
+        }
+
+        private void updateObservers(List<File> directories) {
+            Set<File> wanted = new HashSet<>(directories);
+            observers.entrySet().removeIf(entry -> {
+                if (wanted.contains(entry.getKey())) return false;
+                entry.getValue().stopWatching();
+                return true;
+            });
+            for (File directory : directories) observers.computeIfAbsent(directory, dir -> {
+                FileObserver observer = new FileObserver(dir,
                         FileObserver.CLOSE_WRITE | FileObserver.MOVED_TO | FileObserver.MOVED_FROM
                                 | FileObserver.DELETE | FileObserver.CREATE | FileObserver.DELETE_SELF) {
                     @Override public void onEvent(int event, String path) {
@@ -183,9 +212,8 @@ public final class LibraryScanCoordinator {
                     }
                 };
                 observer.startWatching();
-                observers.add(observer);
-            }
-            return paths;
+                return observer;
+            });
         }
 
         @Override public void index(List<String> paths, IndexCallback callback) {
@@ -193,23 +221,37 @@ public final class LibraryScanCoordinator {
                     (path, uri) -> callback.complete(path, uri != null));
         }
         @Override public void reconcile(ScanRequest request, boolean complete) {
+            if (!scopeIsCurrent()) {
+                handler.post(rescan);
+                return;
+            }
+            boolean targeted = !request.roots.isEmpty();
             SyncWithMediaStoreAsyncTask.Progress progress =
-                    discography.syncWithMediaStore(p -> {}, request.forceRebuild, discovery, complete);
+                    discography.syncWithMediaStore(p -> {}, request.forceRebuild, discovery, complete, targeted,
+                            this::scopeIsCurrent);
+            if (!scopeIsCurrent()) {
+                handler.post(rescan);
+                return;
+            }
             if (request.forceRebuild) {
-                boolean healthy = complete && discovery.complete;
+                boolean healthy = !progress.deferred && complete && discovery.complete;
                 String info = progress.buildInfoString(context);
                 handler.post(() -> io.github.omblivion.needle.util.SafeToast.show(context,
                         healthy ? context.getString(io.github.omblivion.needle.R.string.library_scan_completed)
                                 + (info.isEmpty() ? "" : ": " + info)
                                 : context.getString(io.github.omblivion.needle.R.string.library_scan_deferred)));
             }
-            if (complete && discovery.complete) {
-                previous.clear();
+            if (!progress.deferred && complete && discovery.complete) {
+                if (!targeted) previous.clear();
                 previous.putAll(discovery.files);
             }
             if (discography.hasPendingRemovals() || discography.hasMetadataRetries()) {
                 handler.postDelayed(rescan, 2_000);
             }
+        }
+
+        private boolean scopeIsCurrent() {
+            return rootSetting.equals(PreferenceUtil.getInstance().getLibraryRootSetting());
         }
 
         @Override public void failed(ScanRequest request) {

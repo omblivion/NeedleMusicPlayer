@@ -25,8 +25,8 @@ import androidx.annotation.NonNull;
 import io.github.omblivion.needle.discog.Discography;
 import io.github.omblivion.needle.model.Song;
 import io.github.omblivion.needle.provider.HistoryStore;
+import io.github.omblivion.needle.provider.ReferenceKey;
 import io.github.omblivion.needle.provider.SongPlayCountStore;
-import io.github.omblivion.needle.provider.StoreLoader;
 import io.github.omblivion.needle.sort.SongSortOrder;
 import io.github.omblivion.needle.util.OopsHandler;
 import io.github.omblivion.needle.util.PreferenceUtil;
@@ -34,6 +34,7 @@ import io.github.omblivion.needle.util.PreferenceUtil;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Map;
 
 public class TopAndRecentlyPlayedTracksLoader {
     @NonNull
@@ -41,10 +42,7 @@ public class TopAndRecentlyPlayedTracksLoader {
         final long cutoff = PreferenceUtil.getInstance().getRecentlyPlayedCutoffTimeMillis();
         if (cutoff == 0) {return new ArrayList<>();}
 
-        HistoryStore historyStore = HistoryStore.getInstance(context);
-        ArrayList<Long> songIds = historyStore.getRecentIds(cutoff);
-
-        return Discography.getInstance().getSongsFromIdsAndCleanupOrphans(songIds, historyStore::removeSongIds);
+        return resolveHistory(HistoryStore.getInstance(context), cutoff);
     }
 
     @NonNull
@@ -53,27 +51,37 @@ public class TopAndRecentlyPlayedTracksLoader {
         if (cutoff == 0) {return new ArrayList<>();}
 
         HistoryStore historyStore = HistoryStore.getInstance(context);
-        ArrayList<Long> songIds = new ArrayList<>();
+        ArrayList<Song> result = new ArrayList<>();
 
         // Collect not played songs
         Discography discography = Discography.getInstance();
-        HashSet<Long> playedSongIds = new HashSet<>(historyStore.getRecentIds(0));
+        HashSet<Long> playedSongIds = new HashSet<>();
+        for (Song song : resolveHistory(historyStore, 0)) playedSongIds.add(song.id);
         @NonNull final String sortOrderStr = PreferenceUtil.getInstance().getNotRecentlyPlayedSortOrder();
         Comparator<Song> sortOrder = sortOrderStr.equals(PreferenceUtil.ALBUM_SORT_ORDER) ? SongSortOrder.BY_ALBUM_DATE_ADDED : SongSortOrder.BY_DATE_ADDED;
         ArrayList<Song> allSongs = discography.getAllSongs(sortOrder);
 
         for (Song song : allSongs) {
             if (!playedSongIds.contains(song.id)) {
-                songIds.add(song.id);
-                playedSongIds.remove(song.id);
+                result.add(song);
             }
         }
 
         // Collect not recently played songs
-        ArrayList<Long> notRecentSongIds = historyStore.getRecentIds(-1 * cutoff);
-        songIds.addAll(notRecentSongIds);
+        result.addAll(resolveHistory(historyStore, -cutoff));
+        return result;
+    }
 
-        return discography.getSongsFromIdsAndCleanupOrphans(songIds, historyStore::removeSongIds);
+    private static ArrayList<Song> resolveHistory(HistoryStore store, long cutoff) {
+        Map<String, Song> byPath = Discography.getInstance().getSongsByCanonicalPath();
+        HashSet<String> seen = new HashSet<>();
+        ArrayList<Song> result = new ArrayList<>();
+        for (ReferenceKey key : store.getRecentKeys(cutoff)) {
+            if (key.path().isEmpty() || !seen.add(key.path())) continue;
+            Song song = byPath.get(key.path());
+            if (song != null) result.add(song);
+        }
+        return result;
     }
 
     @NonNull
@@ -83,11 +91,18 @@ public class TopAndRecentlyPlayedTracksLoader {
 
         final int NUMBER_OF_TOP_TRACKS = 100;
         try (Cursor cursor = SongPlayCountStore.getInstance(context).getTopPlayedResults(
-                NUMBER_OF_TOP_TRACKS, PreferenceUtil.getInstance().getTopTracksWindow(),
+                0, PreferenceUtil.getInstance().getTopTracksWindow(),
                 System.currentTimeMillis())) {
-            ArrayList<Long> songIds = StoreLoader.getIdsFromCursor(cursor, SongPlayCountStore.Columns.ID);
-            Discography discography = Discography.getInstance();
-            return discography.getSongsFromIdsAndCleanupOrphans(songIds, null);
+            Map<String, Song> byPath = Discography.getInstance().getSongsByCanonicalPath();
+            ArrayList<Song> result = new ArrayList<>();
+            int pathColumn = cursor.getColumnIndexOrThrow(SongPlayCountStore.Columns.PATH);
+            while (result.size() < NUMBER_OF_TOP_TRACKS && cursor.moveToNext()) {
+                String path = cursor.getString(pathColumn);
+                if (path.isEmpty()) continue;
+                Song song = byPath.get(path);
+                if (song != null) result.add(song);
+            }
+            return result;
         } catch (SQLiteException|IllegalStateException exception) {
             OopsHandler.collectStackTrace(exception);
             return new ArrayList<>();

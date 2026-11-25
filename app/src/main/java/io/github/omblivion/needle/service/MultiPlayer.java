@@ -60,24 +60,29 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
      */
     @Override
     public boolean setDataSource(@NonNull final String path) {
+        return openDataSource(path) == SourceResult.OPENED;
+    }
+
+    @Override
+    public SourceResult openDataSource(@NonNull String path) {
         mIsInitialized = false;
-        mIsInitialized = setDataSourceImpl(mCurrentMediaPlayer, path);
+        SourceResult result = setDataSourceImpl(mCurrentMediaPlayer, path);
+        mIsInitialized = result == SourceResult.OPENED;
         if (mIsInitialized) {
             setNextDataSource(null);
         }
-        return mIsInitialized;
+        return result;
     }
 
     /**
      * @param player The {@link MediaPlayer} to use
      * @param path   The path of the file, or the http/rtsp URL of the stream
      *               you want to play
-     * @return True if the <code>player</code> has been prepared and is
-     * ready to play, false otherwise
+     * @return Whether opening the source or preparing the decoder failed
      */
-    private boolean setDataSourceImpl(@NonNull final MediaPlayer player, @NonNull final String path) {
+    private SourceResult setDataSourceImpl(@NonNull final MediaPlayer player, @NonNull final String path) {
         if (context == null) {
-            return false;
+            return SourceResult.UNAVAILABLE;
         }
         try {
             player.reset();
@@ -87,6 +92,11 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             } else {
                 player.setDataSource(path);
             }
+        } catch (Exception unavailable) {
+            OopsHandler.collectStackTrace(unavailable);
+            return SourceResult.UNAVAILABLE;
+        }
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 player.setAudioAttributes(MusicService.PLAYBACK_ATTRIBUTE);
             } else {
@@ -95,7 +105,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             player.prepare();
         } catch (Exception e) {
             OopsHandler.collectStackTrace(e);
-            return false;
+            return SourceResult.DECODER_FAILED;
         }
         player.setOnCompletionListener(this);
         player.setOnErrorListener(this);
@@ -104,7 +114,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
         intent.putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.getPackageName());
         intent.putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC);
         context.sendBroadcast(intent);
-        return true;
+        return SourceResult.OPENED;
     }
 
     /**
@@ -143,7 +153,7 @@ public class MultiPlayer implements Playback, MediaPlayer.OnErrorListener, Media
             mNextMediaPlayer = new MediaPlayer();
             mNextMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
             mNextMediaPlayer.setAudioSessionId(getAudioSessionId());
-            if (setDataSourceImpl(mNextMediaPlayer, path)) {
+            if (setDataSourceImpl(mNextMediaPlayer, path) == SourceResult.OPENED) {
                 try {
                     mCurrentMediaPlayer.setNextMediaPlayer(mNextMediaPlayer);
                 } catch (@NonNull IllegalArgumentException | IllegalStateException e) {

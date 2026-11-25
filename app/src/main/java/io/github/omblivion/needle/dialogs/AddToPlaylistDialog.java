@@ -71,10 +71,10 @@ public class AddToPlaylistDialog extends DialogFragment {
                                             PlaylistsUtil.addToPlaylist(ctx, songs, playlistId, true)
                                     ).onNegative((dialog, which) -> {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                            songs.removeIf(song -> PlaylistsUtil.doesPlaylistContain(playlistId, song.id));
+                                            songs.removeIf(song -> PlaylistsUtil.doesPlaylistContain(playlistId, song));
                                         } else {
                                             for (Song song: new ArrayList<>(songs)) {
-                                                if (PlaylistsUtil.doesPlaylistContain(playlistId, song.id)) {
+                                                if (PlaylistsUtil.doesPlaylistContain(playlistId, song)) {
                                                     songs.remove(song);
                                                 }
                                             }
@@ -94,7 +94,7 @@ public class AddToPlaylistDialog extends DialogFragment {
 
     private static boolean hasDuplicates(long playlistId, ArrayList<Song> songs) {
         for (Song song: songs) {
-            if (PlaylistsUtil.doesPlaylistContain(playlistId, song.id)) {
+            if (PlaylistsUtil.doesPlaylistContain(playlistId, song)) {
                 return true;
             }
         }

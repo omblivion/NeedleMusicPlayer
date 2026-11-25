@@ -328,28 +328,19 @@ public class MusicUtil {
         return null;
     }
 
-    private static Playlist getOrCreateFavoritesPlaylist(@NonNull final Context context) {
-        return StaticPlaylist.getOrCreatePlaylist(context.getString(R.string.favorites)).asPlaylist();
-    }
-
     public static Playlist getOrCreateSkippedPlaylist(@NonNull final Context context) {
         return StaticPlaylist.getOrCreatePlaylist(context.getString(R.string.skipped_songs)).asPlaylist();
     }
 
     public static boolean isFavorite(@NonNull final Context context, @NonNull final Song song) {
-        Playlist playlist = getFavoritesPlaylist(context);
-        if (playlist == null) {return false;}
-        Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
-        return PlaylistsUtil.doesPlaylistContain(playlist.id, logical.id);
+        return io.github.omblivion.needle.provider.PreferencesBackedSongList.containsStoredPath(
+                context.getString(R.string.favorites), song.getCanonicalCatalogPath());
     }
 
     public static void toggleFavorite(@NonNull final Context context, @NonNull final Song song) {
-        if (isFavorite(context, song)) {
-            PlaylistsUtil.removeFromPlaylist(context, song, getFavoritesPlaylist(context).id);
-        } else {
-            PlaylistsUtil.addToPlaylist(context, song, getOrCreateFavoritesPlaylist(context).id, false);
-        }
-
+        io.github.omblivion.needle.provider.PreferencesBackedSongList.toggleStoredSong(
+                context.getString(R.string.favorites), song);
+        PlaylistsUtil.notifyChange(context);
         context.sendBroadcast(new Intent(MusicService.FAVORITE_STATE_CHANGED).setPackage(context.getPackageName()));
     }
 

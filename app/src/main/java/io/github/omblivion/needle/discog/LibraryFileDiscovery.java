@@ -31,8 +31,7 @@ public final class LibraryFileDiscovery {
         /** True when the catalog row still describes this file version. */
         public boolean matches(io.github.omblivion.needle.model.Song song) {
             if (song.sourceSize >= 0 && song.sourceSize != size) return false;
-            if (song.sourceSize < 0 && song.dateModified > 0
-                    && song.dateModified != modified / 1000) return false;
+            if (song.dateModified > 0 && song.dateModified != modified / 1000) return false;
             return true;
         }
     }
@@ -44,7 +43,11 @@ public final class LibraryFileDiscovery {
         public boolean complete = true;
 
         public boolean covers(String path) {
-            for (String root : roots) if (inDirectory(path, root)) return true;
+            return coversCanonicalPath(SongSource.canonicalPath(path));
+        }
+
+        boolean coversCanonicalPath(String path) {
+            for (String root : roots) if (containsCanonicalPath(path, root)) return true;
             return false;
         }
     }
@@ -52,7 +55,7 @@ public final class LibraryFileDiscovery {
     private final List<String> excluded;
 
     public LibraryFileDiscovery(Collection<String> excluded) {
-        this.excluded = new ArrayList<>(excluded);
+        this.excluded = excluded.stream().map(SongSource::canonicalPath).toList();
     }
 
     public DiscoveryResult discover(Collection<File> roots) {
@@ -67,7 +70,7 @@ public final class LibraryFileDiscovery {
                 result.complete = false;
                 continue;
             }
-            if (!canonical.isDirectory() || !canonical.canRead()) {
+            if ((!canonical.isDirectory() && !canonical.isFile()) || !canonical.canRead()) {
                 result.complete = false;
                 continue;
             }
@@ -81,11 +84,11 @@ public final class LibraryFileDiscovery {
     private void visit(File file, DiscoveryResult result, Set<String> visited, String rootPath) {
         try {
             String path = file.getCanonicalPath();
-            for (String excludedPath : excluded) if (inDirectory(path, excludedPath)) return;
+            for (String excludedPath : excluded) if (containsCanonicalPath(path, excludedPath)) return;
             if (file.isHidden() || file.getName().startsWith(".")) return;
             // Descendants must stay inside the selected canonical root; this
             // rejects symlink cycles and aliases pointing elsewhere.
-            if (!inDirectory(path, rootPath)) return;
+            if (!containsCanonicalPath(path, rootPath)) return;
             if (!visited.add(path)) return;
             if (file.isDirectory()) {
                 if (new File(file, ".nomedia").exists()) return;
@@ -107,9 +110,11 @@ public final class LibraryFileDiscovery {
     }
 
     public static boolean inDirectory(String path, String directory) {
-        String file = SongSource.canonicalPath(path);
-        String root = SongSource.canonicalPath(directory);
-        return file.equals(root) || file.startsWith(root.endsWith(File.separator)
+        return containsCanonicalPath(SongSource.canonicalPath(path), SongSource.canonicalPath(directory));
+    }
+
+    static boolean containsCanonicalPath(String path, String root) {
+        return path.equals(root) || path.startsWith(root.endsWith(File.separator)
                 ? root : root + File.separator);
     }
 

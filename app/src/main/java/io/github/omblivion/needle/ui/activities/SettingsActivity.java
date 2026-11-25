@@ -206,11 +206,8 @@ public class SettingsActivity extends AbsBaseActivity implements ColorChooserDia
             addPreferencesFromResource(R.xml.pref_migrating);
             addPreferencesFromResource(R.xml.pref_development);
 
-            // set summary for whitelist, in order to indicate start directory
-            final String strSummaryWhitelist = getString(R.string.pref_summary_whitelist);
             final File startDirectory = PreferenceUtil.getInstance().getStartDirectory();
-            final String startPath = FileUtil.safeGetCanonicalPath(startDirectory);
-            findPreference(PreferenceUtil.WHITELIST_ENABLED).setSummary(strSummaryWhitelist+startPath);
+            findPreference("library_folder").setSummary(startDirectory.getPath());
         }
 
         @Nullable
@@ -350,11 +347,6 @@ public class SettingsActivity extends AbsBaseActivity implements ColorChooserDia
                 });
             }
 
-            final TwoStatePreference whitelistEnabled = findPreference(PreferenceUtil.WHITELIST_ENABLED);
-            if (whitelistEnabled != null) {
-                whitelistEnabled.setChecked(PreferenceUtil.getInstance().getWhitelistEnabled());
-            }
-          
             final ATEColorPreference primaryColorPref = findPreference(PreferenceUtil.PRIMARY_COLOR);
             if (getActivity() != null && primaryColorPref != null) {
                 final int primaryColor = PreferenceUtil.getInstance().getPrimaryColor();

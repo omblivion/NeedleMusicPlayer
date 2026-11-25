@@ -90,6 +90,19 @@ public class QueueInvariantTest {
         assertEquals(-1, queue.getCurrentPosition());
     }
 
+    @Test public void scanReconciliationRemovesMatchingOccurrenceInBothShuffledOrders() {
+        ArrayList<IndexedSong> original = saved(song(1), song(2), song(3));
+        ArrayList<IndexedSong> shuffled = new ArrayList<>(
+                List.of(original.get(2), original.get(0), original.get(1)));
+        StaticPlayingQueue queue = new StaticPlayingQueue(shuffled, original, 2,
+                StaticPlayingQueue.SHUFFLE_MODE_SHUFFLE, 0);
+        queue.reconcileSourcesByPath(java.util.Map.of(), track -> track.id == 3, false);
+        assertEquals(List.of(1L, 2L), queue.getPlayingQueue().stream().map(track -> track.id).toList());
+        assertEquals(List.of(1L, 2L), queue.getOriginalPlayingQueue().stream().map(track -> track.id).toList());
+        assertEquals(1, queue.getCurrentPosition());
+        assertConsistent(queue);
+    }
+
     @Test public void batchRemovalReturnsFinalReplacementPosition() {
         StaticPlayingQueue queue = queueAt(2);
         queue.add(song(4));

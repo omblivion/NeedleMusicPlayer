@@ -106,12 +106,23 @@ public final class PlaybackSourceResolver {
             // The stored reference resolves to a different file; never open it.
             return new Resolution(Status.MISMATCH, null, null);
         }
+        // Version fields invalidate cached metadata, not the identity of this
+        // exact path. A rescan or an old catalog must not prevent opening it.
         if (expectedSource.versionChanged(verifiedSource)) {
-            // The catalog snapshot predates the current file content; opening it
-            // would play audio the displayed metadata does not describe.
-            return new Resolution(Status.UNAVAILABLE, null, null);
+            Song fresh = new Song(id, verified.title, expected.trackNumber, expected.year,
+                    value(cursor, MediaStore.Audio.Media.DURATION, expected.duration), expected.data,
+                    value(cursor, MediaStore.Audio.Media.DATE_ADDED, expected.dateAdded),
+                    value(cursor, MediaStore.Audio.Media.DATE_MODIFIED, expected.dateModified),
+                    verified.albumId, verified.albumName, verified.artistNames);
+            fresh.contentUri = uri;
+            fresh.sourceSize = verified.sourceSize;
+            fresh.sourceGeneration = verified.sourceGeneration;
+            fresh.sourceAddedGeneration = verified.sourceAddedGeneration;
+            fresh.providerVersion = verified.providerVersion;
+            verified = fresh;
         }
-        return new Resolution(Status.VERIFIED, verified, uri);    }
+        return new Resolution(Status.VERIFIED, verified, uri);
+    }
 
     private static long value(Cursor cursor, String column, long fallback) {
         int index = cursor.getColumnIndexOrThrow(column);

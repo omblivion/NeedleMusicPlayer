@@ -199,6 +199,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     private QueueSaveHandler queueSaveHandler;
     private HandlerThread queueSaveHandlerThread;
+    private Handler playbackStorageHandler;
 
     private final SongPlayCountHelper songPlayCountHelper = new SongPlayCountHelper();
     private ThrottledSeekHandler throttledSeekHandler;
@@ -347,6 +348,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         queueSaveHandlerThread = new HandlerThread("QueueSaveHandler", Process.THREAD_PRIORITY_BACKGROUND);
         queueSaveHandlerThread.start();
         queueSaveHandler = new QueueSaveHandler(this, queueSaveHandlerThread.getLooper());
+        playbackStorageHandler = new Handler(queueSaveHandlerThread.getLooper());
 
         uiThreadHandler = new Handler();
 
@@ -408,8 +410,11 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 // Just in case the async queue restore has not been excuted yet
                 synchronized (this) {
                     if (!queuesRestored) {
-                        restoreQueuesAndPosition();
-                        queuesRestored = true;
+                        queueSaveHandler.post(() -> {
+                            restoreQueuesAndPosition();
+                            new Handler(getMainLooper()).post(() -> onStartCommand(intent, flags, startId));
+                        });
+                        return START_NOT_STICKY;
                     }
                 }
 
@@ -451,7 +456,8 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                         playNextSong(true);
                         break;
                     case TOGGLE_FAVORITE:
-                        MusicUtil.toggleFavorite(this, getCurrentSong());
+                        Song favorite = getCurrentSong();
+                        runPlaybackStorage(() -> MusicUtil.toggleFavorite(this, favorite));
                         break;
                     case ACTION_STOP:
                     case ACTION_QUIT:
@@ -509,17 +515,31 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     void saveQueuesImpl() {
+        ArrayList<IndexedSong> queue;
+        ArrayList<IndexedSong> original;
         synchronized (this) {
-            io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
-                Discography discography = Discography.getInstance();
-                playingQueue.reconcileSources(discography.getAllSongsById(),
-                        discography.getConfirmedDeletedIds(), false);
-                MusicPlaybackQueueStore.getInstance(this).saveQueues(
-                        new ArrayList<>(playingQueue.getPlayingQueue()),
-                        new ArrayList<>(playingQueue.getOriginalPlayingQueue()));
-                return null;
-            });
+            queue = copyQueue(playingQueue.getPlayingQueue());
+            original = copyQueue(playingQueue.getOriginalPlayingQueue());
         }
+        MusicPlaybackQueueStore.getInstance(this).saveQueues(queue, original);
+    }
+
+    private static ArrayList<IndexedSong> copyQueue(List<IndexedSong> source) {
+        ArrayList<IndexedSong> copy = new ArrayList<>(source.size());
+        for (IndexedSong song : source) copy.add(new IndexedSong(song, song.index, song.getUniqueId()));
+        return copy;
+    }
+
+    /** Persistence may wait for a scan; never make a playback callback wait with it. */
+    private void runPlaybackStorage(Runnable action) {
+        if (playbackStorageHandler == null) action.run();
+        else playbackStorageHandler.post(() -> {
+            try {
+                action.run();
+            } catch (RuntimeException failure) {
+                OopsHandler.collectStackTrace(failure);
+            }
+        });
     }
 
     private void savePosition() {
@@ -560,25 +580,28 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     void restoreQueuesAndPosition() {
         synchronized (this) {
-            try {
+            if (queuesRestored) return;
+        }
+        try {
                 // A cold start must resolve saved entries against the committed
                 // catalog, never against an empty cache.
                 Discography.getInstance().ensureLoaded();
-                // The current playback state
-                final Song savedSong = getCurrentSong();
-
                 // The saved state
                 final MusicPlaybackQueueStore queueStore = MusicPlaybackQueueStore.getInstance(this);
-                final ArrayList<IndexedSong> restoredQueue = queueStore.getSavedPlayingQueue();
-                final ArrayList<IndexedSong> restoredOriginalQueue = queueStore.getSavedOriginalPlayingQueue();
+                final List<ArrayList<IndexedSong>> restoredQueues =
+                        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
+                                List.of(queueStore.getSavedPlayingQueue(), queueStore.getSavedOriginalPlayingQueue()));
                 final int restoredPosition = PreferenceManager.getDefaultSharedPreferences(this)
                         .getInt(SAVED_POSITION, StaticPlayingQueue.INVALID_POSITION);
                 final int restoredPositionInTrack = PreferenceManager.getDefaultSharedPreferences(this)
                         .getInt(SAVED_POSITION_IN_TRACK, -1);
 
+            synchronized (this) {
+                if (queuesRestored) return;
+                final Song savedSong = getCurrentSong();
                 StaticPlayingQueue restored = new StaticPlayingQueue(
-                        restoredQueue,
-                        restoredOriginalQueue,
+                        restoredQueues.get(0),
+                        restoredQueues.get(1),
                         restoredPosition,
                         playingQueue.getShuffleMode(),
                         playingQueue.getRepeatMode()
@@ -602,14 +625,13 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
                 prepareNext();
                 sendChangeInternal(QUEUE_CHANGED);
-            } catch (ArrayIndexOutOfBoundsException | IllegalArgumentException queueCopiesOutOfSync) {
-                // fallback, when the copies of the restored queues are out of sync or the queues are corrupted
-                OopsHandler.collectStackTrace(queueCopiesOutOfSync);
-                SafeToast.show(this, R.string.failed_restore_playing_queue);
-
-                final int shuffleMode = playingQueue.getShuffleMode();
-                playingQueue = new StaticPlayingQueue();
-                playingQueue.setShuffle(shuffleMode);
+            }
+        } catch (RuntimeException failure) {
+            OopsHandler.collectStackTrace(failure);
+            SafeToast.show(this, R.string.failed_restore_playing_queue);
+            // Keep any live queue and do not replace the saved one with a failed read.
+            synchronized (this) {
+                queuesRestored = true;
             }
         }
     }
@@ -670,39 +692,48 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         }
     }
 
-    boolean openTrackAndPrepareNextAt(int position) {
+    enum OpenResult { OPENED, SOURCE_UNAVAILABLE, PLAYER_FAILED }
+
+    OpenResult openTrackAndPrepareNextAt(int position) {
         synchronized (this) {
             // Measure the outgoing track before switching: if it was heard for
             // long enough, the run of skipped tracks is over.
             resetConsecutiveSkipsIfPlayed();
             playingQueue.setCurrentPosition(position);
-            boolean prepared = openCurrent();
-            if (prepared) prepareNextImpl();
+            OpenResult result = openCurrentSource();
+            if (result == OpenResult.OPENED) prepareNextImpl();
             notifyChange(META_CHANGED);
             notHandledMetaChangedForCurrentTrack = false;
-            return prepared;
+            return result;
         }
     }
 
     private boolean openCurrent() {
+        return openCurrentSource() == OpenResult.OPENED;
+    }
+
+    private OpenResult openCurrentSource() {
         synchronized (this) {
+            openedSong = null;
+            openedSource = null;
             try {
                 Song requested = getSongAt(getPosition());
                 PlaybackSourceResolver.Resolution source = PlaybackSourceResolver.resolve(this, requested);
                 if (source.status != PlaybackSourceResolver.Status.VERIFIED || playback == null) {
-                    return false;
+                    if (playback != null && playback.isInitialized()) playback.stop();
+                    return OpenResult.SOURCE_UNAVAILABLE;
                 }
-                if (playback.setDataSource(source.uri)) {
+                Playback.SourceResult result = playback.openDataSource(source.uri);
+                if (result == Playback.SourceResult.OPENED) {
                     openedSong = new Song(source.song);
                     openedSource = io.github.omblivion.needle.model.SongSource.from(source.song);
-                    return true;
+                    return OpenResult.OPENED;
                 }
-                openedSong = null;
-                openedSource = null;
-                return false;
+                return result == Playback.SourceResult.UNAVAILABLE
+                        ? OpenResult.SOURCE_UNAVAILABLE : OpenResult.PLAYER_FAILED;
             } catch (Exception e) {
                 OopsHandler.collectStackTrace(e);
-                return false;
+                return OpenResult.PLAYER_FAILED;
             }
         }
     }
@@ -1053,6 +1084,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
         synchronized (this) {
             if (playingQueue.openQueue(queue, position, shuffleMode)) {
+                queuesRestored = true;
                 if (startPlaying) {
                     playSongAt(playingQueue.getCurrentPosition(), false);
                 } else {
@@ -1158,11 +1190,12 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
             if ((songProgressMs > SKIP_THRESHOLD_MS) // not just started
                     && (songDurationMs - songProgressMs > SKIP_THRESHOLD_MS) // not about to end
             ) {
-                // Mark the current song as skipped
-                final long playlistId = MusicUtil.getOrCreateSkippedPlaylist(this).id;
-                if (!PlaylistsUtil.doesPlaylistContain(playlistId, song.id)) {
-                    PlaylistsUtil.addToPlaylist(this, song, playlistId, true);
-                }
+                runPlaybackStorage(() -> {
+                    final long playlistId = MusicUtil.getOrCreateSkippedPlaylist(this).id;
+                    if (!PlaylistsUtil.doesPlaylistContain(playlistId, song)) {
+                        PlaylistsUtil.addToPlaylist(this, song, playlistId, true);
+                    }
+                });
             }
         }
 
@@ -1190,10 +1223,13 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     void playSongAtImpl(int position) {
-        if (openTrackAndPrepareNextAt(position)) {
-            play();
-        } else {
-            onTrackUnplayable();
+        switch (openTrackAndPrepareNextAt(position)) {
+            case OPENED -> play();
+            case PLAYER_FAILED -> onTrackUnplayable();
+            case SOURCE_UNAVAILABLE -> {
+                SafeToast.show(this, R.string.unplayable_file);
+                skipToNextPlayable(true);
+            }
         }
     }
 
@@ -1219,24 +1255,32 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
         unplayableTracks.markUnplayable(getTrackUri(song));
         recoverySong = Song.EMPTY_SONG;
         if (playbackHandler != null) playbackHandler.removeMessages(CHECK_UNPLAYABLE_RECOVERY);
-        try {
-            UnplayableTrackStore.getInstance(this).recordFailure(song);
-        } catch (Exception error) {
-            // Reporting must never prevent the player from skipping a broken file.
-            OopsHandler.collectStackTrace(error);
-        }
+        runPlaybackStorage(() -> {
+            try {
+                UnplayableTrackStore.getInstance(this).recordFailure(song);
+            } catch (RuntimeException error) {
+                OopsHandler.collectStackTrace(error);
+            }
+        });
     }
 
     /** Observe actual playback, not preparation or a seek, before dismissing a report. */
     void scheduleUnplayableTrackRecovery() {
+        Song song;
         synchronized (this) {
             if (playbackHandler != null) playbackHandler.removeMessages(CHECK_UNPLAYABLE_RECOVERY);
             recoverySong = Song.EMPTY_SONG;
-            try {
-                Song song = getCurrentSong();
-                if (!isPlaying() || unplayableTracks.isUnplayable(getTrackUri(song))
-                        || !UnplayableTrackStore.getInstance(this).contains(song)
-                        || !MusicUtil.isSongFileIdentityCurrent(this, song)) return;
+            if (!isPlaying()) return;
+            song = getCurrentSong();
+            if (unplayableTracks.isUnplayable(getTrackUri(song))) return;
+        }
+        try {
+            if (!UnplayableTrackStore.getInstance(this).contains(song)
+                    || !MusicUtil.isSongFileIdentityCurrent(this, song)) return;
+            synchronized (this) {
+                Song current = getCurrentSong();
+                if (!isPlaying() || current.id != song.id || !current.data.equals(song.data)
+                        || unplayableTracks.isUnplayable(getTrackUri(song))) return;
                 recoverySong = song;
                 recoveryLastSampleAt = SystemClock.elapsedRealtime();
                 recoveryLastPosition = getSongProgressMillis();
@@ -1244,11 +1288,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 if (playbackHandler != null) {
                     playbackHandler.sendEmptyMessageDelayed(CHECK_UNPLAYABLE_RECOVERY, 250);
                 }
-            } catch (RuntimeException error) {
-                // Optional maintenance data must never interrupt normal playback.
-                recoverySong = Song.EMPTY_SONG;
-                OopsHandler.collectStackTrace(error);
             }
+        } catch (RuntimeException error) {
+            OopsHandler.collectStackTrace(error);
         }
     }
 
@@ -1258,6 +1300,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
     }
 
     void checkForRecoveredTrack() {
+        Song recovered = null;
         synchronized (this) {
             Song song = getCurrentSong();
             if (recoverySong.id == Song.EMPTY_SONG.id || !isPlaying()
@@ -1275,9 +1318,7 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 recoveryLastSampleAt = now;
                 recoveryLastPosition = position;
                 if (recoveryProgressMillis >= recoveryInterval(song)) {
-                    if (MusicUtil.isSongFileIdentityCurrent(this, song)) {
-                        UnplayableTrackStore.getInstance(this).remove(song);
-                    }
+                    recovered = song;
                     recoverySong = Song.EMPTY_SONG;
                 } else if (playbackHandler != null) {
                     playbackHandler.sendEmptyMessageDelayed(CHECK_UNPLAYABLE_RECOVERY, 250);
@@ -1286,6 +1327,19 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 recoverySong = Song.EMPTY_SONG;
                 OopsHandler.collectStackTrace(error);
             }
+        }
+        if (recovered != null) {
+            Song song = recovered;
+            runPlaybackStorage(() -> {
+                try {
+                    if (!unplayableTracks.isUnplayable(getTrackUri(song))
+                            && MusicUtil.isSongFileIdentityCurrent(this, song)) {
+                        UnplayableTrackStore.getInstance(this).remove(song);
+                    }
+                } catch (RuntimeException error) {
+                    OopsHandler.collectStackTrace(error);
+                }
+            });
         }
     }
 
@@ -1521,8 +1575,11 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 if (!isPlaying && getSongProgressMillis() > 0) {
                     savePositionInTrack();
                 }
-                songPlayCountHelper.notifyPlayStateChanged(isPlaying);
-                scheduleUnplayableTrackRecovery();
+                long stateAt = SystemClock.elapsedRealtime();
+                runPlaybackStorage(() -> {
+                    songPlayCountHelper.notifyPlayStateChanged(isPlaying, stateAt);
+                    scheduleUnplayableTrackRecovery();
+                });
                 break;
             case FAVORITE_STATE_CHANGED:
                 updateNotification();
@@ -1536,16 +1593,21 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                 savePositionInTrack();
                 applyReplayGain();
 
-                final Song currentSong = getCurrentSong();
-                HistoryStore.getInstance(this).addSongId(currentSong.id);
-                if (PreferenceUtil.getInstance().maintainTopTrackPlaylist()) {
+                final Song currentSong = new Song(getCurrentSong());
+                long changedAt = SystemClock.elapsedRealtime();
+                boolean started = isPlaying();
+                runPlaybackStorage(() -> {
+                    HistoryStore.getInstance(this).addSongId(currentSong.id, currentSong.data);
                     SongPlayCountStore store = SongPlayCountStore.getInstance(this);
-                    if (songPlayCountHelper.commitIfQualified(store, songPlayCountHelper.getElapsedTime())) {
+                    if (PreferenceUtil.getInstance().maintainTopTrackPlaylist()
+                            && songPlayCountHelper.commitIfQualified(store,
+                                    songPlayCountHelper.getElapsedTime(changedAt))) {
                         sendChangeInternal(STATISTICS_CHANGED);
                     }
-                }
-                songPlayCountHelper.notifySongChanged(currentSong, SongPlayCountStore.getInstance(this));
-                scheduleUnplayableTrackRecovery();
+                    songPlayCountHelper.notifySongChanged(currentSong, store);
+                    songPlayCountHelper.notifyPlayStateChanged(started, changedAt);
+                    scheduleUnplayableTrackRecovery();
+                });
                 break;
             case QUEUE_CHANGED:
                 updateMediaSessionMetaData(); // because playing queue size might have changed
@@ -1790,10 +1852,9 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
 
     private void reconcileLibrary() {
         synchronized (this) {
-            io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
                 Discography discography = Discography.getInstance();
-                playingQueue.reconcileSources(discography.getAllSongsById(),
-                        discography.getConfirmedDeletedIds(),
+                playingQueue.reconcileSourcesByPath(discography.getSongsByCanonicalPath(),
+                        discography::isConfirmedDeleted,
                         PreferenceUtil.getInstance().isQueueSyncWithMediaStoreEnabled());
                 if (openedSong != null) {
                     Song logical = discography.resolveReference(openedSong);
@@ -1812,14 +1873,10 @@ public class MusicService extends MediaBrowserServiceCompat implements SharedPre
                         openedSong = new Song(logical);
                     }
                 }
-                prepareNextImpl();
-                saveQueuesImpl();
-                return null;
-            });
-            notifyChange(QUEUE_CHANGED);
-            updateNotification();
-            updateMediaSessionMetaData();
-            sendChangeInternal(META_CHANGED);
         }
+        notifyChange(QUEUE_CHANGED);
+        updateNotification();
+        updateMediaSessionMetaData();
+        sendChangeInternal(META_CHANGED);
     }
 }

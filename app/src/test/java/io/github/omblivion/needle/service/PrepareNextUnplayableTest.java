@@ -20,9 +20,9 @@ public class PrepareNextUnplayableTest {
         String preloadedUri;
         int preloadedPosition = -1;
 
-        @Override boolean openTrackAndPrepareNextAt(int position) {
+        @Override OpenResult openTrackAndPrepareNextAt(int position) {
             setPositionForTest(position);
-            return true;
+            return OpenResult.OPENED;
         }
 
         @Override public void play() {

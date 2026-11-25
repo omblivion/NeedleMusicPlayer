@@ -112,7 +112,12 @@ public class HistoryStore extends SQLiteOpenHelper {
 
             for (ReferenceKey key : keys) {
                 // remove previous entries
-                removeSongId(database, key.id());
+                if (key.path().isEmpty()) {
+                    database.delete(RecentStoreColumns.NAME, "song_id=? AND path=''",
+                            new String[]{Long.toString(key.id())});
+                } else {
+                    database.delete(RecentStoreColumns.NAME, "path=?", new String[]{key.path()});
+                }
 
                 // add the entry
                 values.clear();

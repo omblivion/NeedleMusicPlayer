@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import io.github.omblivion.needle.model.Song;
+import io.github.omblivion.needle.provider.ReferenceKey;
 import io.github.omblivion.needle.provider.SongPlayCountStore;
 import io.github.omblivion.needle.service.MusicService;
 
@@ -30,7 +31,7 @@ public final class ResetPlayCountsHelper {
         }
         final Context appContext = context.getApplicationContext();
         executor.execute(() -> {
-            SongPlayCountStore.getInstance(appContext).resetSong(song.id);
+            SongPlayCountStore.getInstance(appContext).resetSong(ReferenceKey.of(song));
             appContext.sendBroadcast(new Intent(MusicService.STATISTICS_CHANGED).setPackage(appContext.getPackageName()));
         });
     }

@@ -13,6 +13,16 @@ import java.util.List;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34, application = App.class)
 public class LibraryFileDiscoveryTest {
+    @Test public void targetedFileScanDoesNotEnumerateSiblingTracks() throws Exception {
+        File root = RuntimeEnvironment.getApplication().getCacheDir();
+        File target = file(root, "nested/one.mp3");
+        File sibling = file(root, "nested/two.mp3");
+        var result = new LibraryFileDiscovery(List.of()).discover(List.of(target));
+        assertTrue(result.complete);
+        assertEquals(java.util.Set.of(target.getCanonicalPath()), result.files.keySet());
+        assertFalse(result.covers(sibling.getPath()));
+    }
+
     @Test public void unchangedProviderObservationDoesNotRequireColdStartReindex() throws Exception {
         File root = RuntimeEnvironment.getApplication().getCacheDir();
         File file = file(root, "a.mp3");

@@ -64,9 +64,7 @@ public final class LibraryReferenceStores {
     private static void applyTo(android.content.Context context, String operation, ReferencePlan plan) {
         relocate(HistoryStore.getInstance(context).getWritableDatabase(), operation,
                 List.of("recent_history"), "song_id", "path", plan);
-        relocate(SongPlayCountStore.getInstance(context).getWritableDatabase(), operation,
-                List.of("play_count_stats"), "song_id", "path", plan);
-        relocateEvents(SongPlayCountStore.getInstance(context).getWritableDatabase(), operation, plan);
+        reconcileStatistics(SongPlayCountStore.getInstance(context).getWritableDatabase(), plan);
         relocate(MusicPlaybackQueueStore.getInstance(context).getWritableDatabase(), operation,
                 List.of("playing_queue", "original_playing_queue"), "_id", "expected_path", plan);
         relocate(UnplayableTrackStore.getInstance(context).getWritableDatabase(), operation,
@@ -121,49 +119,26 @@ public final class LibraryReferenceStores {
         }
     }
 
-    /** Play events and legacy weeks follow the stats row that owns the same ID. */
-    private static void relocateEvents(SQLiteDatabase db, String operation, ReferencePlan plan) {
+    /** All statistics for a path move together; replaying a path update is safe. */
+    private static void reconcileStatistics(SQLiteDatabase db, ReferencePlan plan) {
         if (plan.relocations.isEmpty() && plan.deletedKeys.isEmpty()) return;
-        for (String table : List.of("play_event", "legacy_week")) {
-            if (!tableExists(db, table)) continue;
-            relocateIdsOnly(db, table, plan);
-        }
-    }
-
-    private static void relocateIdsOnly(SQLiteDatabase db, String table, ReferencePlan plan) {
         db.beginTransaction();
         try {
-            List<ContentValues> rows = new ArrayList<>();
-            try (Cursor cursor = db.query(table, null, null, null, null, null, "rowid")) {
-                while (cursor.moveToNext()) {
-                    ContentValues row = new ContentValues();
-                    android.database.DatabaseUtils.cursorRowToContentValues(cursor, row);
-                    long oldId = cursor.getLong(cursor.getColumnIndexOrThrow("song_id"));
-                    ReferenceKey key = new ReferenceKey(oldId, "");
-                    if (containsId(plan.deletedKeys, oldId)) continue;
-                    Long newId = relocatedIdFor(plan, oldId);
-                    if (newId != null) row.put("song_id", newId);
-                    rows.add(row);
+            for (String table : List.of("play_count_stats", "play_event", "legacy_week")) {
+                for (ReferenceKey deleted : plan.deletedKeys) {
+                    db.delete(table, "path=?", new String[]{deleted.path()});
+                }
+                for (ReferenceKey target : plan.relocations.values()) {
+                    ContentValues updated = new ContentValues(1);
+                    updated.put("song_id", target.id());
+                    db.update(table, updated, "path=? AND song_id<>?",
+                            new String[]{target.path(), Long.toString(target.id())});
                 }
             }
-            db.delete(table, null, null);
-            for (ContentValues row : rows) db.insertOrThrow(table, null, row);
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
         }
-    }
-
-    private static boolean containsId(java.util.Set<ReferenceKey> keys, long id) {
-        for (ReferenceKey key : keys) if (key.id() == id) return true;
-        return false;
-    }
-
-    private static Long relocatedIdFor(ReferencePlan plan, long id) {
-        for (Map.Entry<ReferenceKey, ReferenceKey> entry : plan.relocations.entrySet()) {
-            if (entry.getKey().id() == id) return entry.getValue().id();
-        }
-        return null;
     }
 
     private static boolean tableExists(SQLiteDatabase db, String table) {

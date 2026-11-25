@@ -11,6 +11,7 @@ import java.util.Set;
 /** Detached candidate catalog. It becomes visible only after its database commit. */
 public final class LibrarySnapshot {
     final Map<Long, Song> songs;
+    final Map<String, Song> songsByPath;
     final MemCache prepared = new MemCache();
     final long baseRevision;
     final Set<Long> confirmedDeleted;
@@ -33,6 +34,7 @@ public final class LibrarySnapshot {
             }
         }
         this.songs = Collections.unmodifiableMap(detached);
+        this.songsByPath = LibraryReferenceReconciler.indexByPath(detached.values());
         this.baseRevision = baseRevision;
         this.confirmedDeleted = Set.copyOf(confirmedDeleted);
         this.confirmedDeletedPaths = Set.copyOf(confirmedDeletedPaths);

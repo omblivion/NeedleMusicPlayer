@@ -61,10 +61,12 @@ public class HistoryPlaylist extends AbsSmartPlaylist {
     @Override
     public void importPlaylist(@NonNull Context context, @NonNull Playlist playlist) {
         List<? extends Song> songs = playlist.getSongs(context);
-        List<Long> songIds = new ArrayList<>(songs.size());
-        for (Song song : songs) {songIds.add(song.id);}
+        List<io.github.omblivion.needle.provider.ReferenceKey> keys = new ArrayList<>(songs.size());
+        for (Song song : songs) {
+            if (!song.data.isEmpty()) keys.add(io.github.omblivion.needle.provider.ReferenceKey.of(song));
+        }
 
-        HistoryStore.getInstance(context).addSongIds(songIds);
+        HistoryStore.getInstance(context).addSongKeys(keys);
         super.importPlaylist(context, playlist);
     }
 

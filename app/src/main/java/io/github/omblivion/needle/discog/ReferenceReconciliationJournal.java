@@ -76,12 +76,26 @@ public final class ReferenceReconciliationJournal extends SQLiteOpenHelper {
     }
 
     Pending read() {
-        try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT operation,target,base_revision FROM pending WHERE id=1", null)) {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor cursor = db.rawQuery(
+                "SELECT operation,length(target),base_revision FROM pending WHERE id=1", null)) {
             if (!cursor.moveToFirst()) return null;
             Parcel parcel = Parcel.obtain();
             try {
-                byte[] bytes = cursor.getBlob(1);
+                byte[] bytes = new byte[cursor.getInt(1)];
+                // Large libraries can exceed Android's CursorWindow row limit.
+                final int chunkSize = 256 * 1024;
+                for (int offset = 0; offset < bytes.length; offset += chunkSize) {
+                    try (Cursor chunk = db.rawQuery("SELECT substr(target,?,?) FROM pending WHERE id=1",
+                            new String[]{Integer.toString(offset + 1), Integer.toString(chunkSize)})) {
+                        if (!chunk.moveToFirst()) throw new IllegalStateException("Missing reference journal");
+                        byte[] part = chunk.getBlob(0);
+                        if (part.length != Math.min(chunkSize, bytes.length - offset)) {
+                            throw new IllegalStateException("Incomplete reference journal");
+                        }
+                        System.arraycopy(part, 0, bytes, offset, part.length);
+                    }
+                }
                 parcel.unmarshall(bytes, 0, bytes.length);
                 parcel.setDataPosition(0);
                 ArrayList<Song> songs = parcel.createTypedArrayList(Song.CREATOR);

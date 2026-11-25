@@ -123,8 +123,9 @@ Lint XML: `app/build/reports/lint-results-<variant>.xml`; count
 
 - Package root: `io.github.omblivion.needle` under
   `app/src/main/java/io/github/omblivion/needle/`.
-- Play statistics: `provider/SongPlayCountStore.java` (SQLite, schema v4:
-  cumulative totals + reset versions, dated events, imported v3 weekly buckets).
+- Play statistics: `provider/SongPlayCountStore.java` (SQLite, schema v6:
+  path-owned cumulative totals, reset versions and dated events; unowned legacy
+  events and weekly buckets remain stored without inferring a path).
   `service/SongPlayCountHelper.java` + `service/MusicService.java` record plays.
 - Most-played windows: `model/TopTracksWindow.java` (preset enum + cutoff math),
   `PreferenceUtil.TOP_TRACKS_WINDOW`, `loader/TopAndRecentlyPlayedTracksLoader`.
@@ -149,8 +150,9 @@ Lint XML: `app/build/reports/lint-results-<variant>.xml`; count
 - This is a `SQLiteOpenHelper`-based app (no Room). Keep the current
   architecture unless a task says otherwise.
 - Library import: `discog/LibraryScanCoordinator.java` serializes recursive
-  discovery, MediaScanner callbacks and catalog reconciliation. Automatic
-  refresh is incremental; explicit rescanning re-extracts derived metadata.
+  discovery from the selected start directory, MediaScanner callbacks and
+  catalog reconciliation. Automatic refresh applies SQLite row deltas;
+  explicit rescanning re-extracts derived metadata in a staged rebuild.
   `LibraryFileDiscovery` tracks incomplete enumeration; absence alone is not
   deletion evidence.
 - Catalog schema v8 and queue schema v8 preserve source locators/versions.

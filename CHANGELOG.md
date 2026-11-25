@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Keep playback and search responsive while the library scan prepares or publishes changes.
+- Use the selected start folder as the recursive library root. Automatic scans write only changed catalog rows, and an incomplete explicit rescan leaves the previous catalog available.
+- Keep playlist membership, history, and play counts attached to their paths even if a file goes offline or Android reuses its ID. Older ID-only data remains stored without guessing its owner.
+- Open verified paths despite stale catalog metadata and keep temporary source-access failures out of the unplayable files list.
+
 ## Needle [0.3.0] - 2026-11-25
 
 ### Features

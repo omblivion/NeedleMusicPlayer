@@ -35,6 +35,7 @@ class SyncWithMediaStoreAsyncTask extends AsyncTask<Void, SyncWithMediaStoreAsyn
         public int added = 0;
         public int removed = 0;
         public int updated = 0;
+        boolean deferred;
 
         boolean isEmpty() {
             return added == 0 && removed == 0 && updated == 0;

@@ -100,8 +100,7 @@ public class PlaylistsUtil {
         StaticPlaylist list = StaticPlaylist.getPlaylist(playlistId);
         if (list == null) {return;}
 
-        Song logical = io.github.omblivion.needle.discog.Discography.getInstance().resolveReference(song);
-        list.removeSong(logical.id);
+        list.removeSong(song);
         notifyChange(context);
     }
 
@@ -115,10 +114,10 @@ public class PlaylistsUtil {
         notifyChange(context);
     }
 
-    public static boolean doesPlaylistContain(final long playlistId, final long songId) {
+    public static boolean doesPlaylistContain(final long playlistId, final Song song) {
         StaticPlaylist list = StaticPlaylist.getPlaylist(playlistId);
         if (list == null) {return false;}
-        return list.contains(songId);
+        return StaticPlaylist.containsStoredPath(list.getName(), song.getCanonicalCatalogPath());
     }
 
     public static boolean moveItem(long playlistId, int from, int to) {

@@ -30,6 +30,19 @@ public final class LibraryReferenceReconciler {
 
     public static ReferencePlan derive(Collection<ReferenceKey> stored, Map<Long, Song> next,
             Set<String> confirmedDeletedPaths) {
+        return deriveByPath(stored, indexByPath(next.values()), confirmedDeletedPaths);
+    }
+
+    static Map<String, Song> indexByPath(Collection<Song> songs) {
+        Map<String, Song> byPath = new HashMap<>();
+        for (Song song : songs) {
+            if (!song.data.isEmpty()) byPath.putIfAbsent(song.getCanonicalCatalogPath(), song);
+        }
+        return Map.copyOf(byPath);
+    }
+
+    static ReferencePlan deriveByPath(Collection<ReferenceKey> stored, Map<String, Song> byPath,
+            Set<String> confirmedDeletedPaths) {
         Set<String> deletedPaths = new HashSet<>();
         for (String path : confirmedDeletedPaths) {
             deletedPaths.add(SongSource.canonicalPath(path));
@@ -38,12 +51,12 @@ public final class LibraryReferenceReconciler {
         Set<ReferenceKey> deleted = new HashSet<>();
         for (ReferenceKey key : stored) {
             if (key.path().isEmpty()) continue;
-            String path = SongSource.canonicalPath(key.path());
+            String path = key.path();
             if (deletedPaths.contains(path)) {
                 deleted.add(key);
                 continue;
             }
-            Song resolved = resolvePath(path, next);
+            Song resolved = byPath.get(path);
             if (resolved != null && resolved.id != key.id()) {
                 relocations.put(key, key.withId(resolved.id));
             }

@@ -206,35 +206,30 @@ public class MusicPlaybackQueueStore extends SQLiteOpenHelper {
 
     @NonNull
     private ArrayList<IndexedSong> getQueue(@NonNull final String tableName) {
-        Map<Long, Song> catalog = Discography.getInstance().getAllSongsById();
+        Map<String, Song> catalog = Discography.getInstance().getSongsByCanonicalPath();
         ArrayList<IndexedSong> queue = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().query(tableName,
                 new String[]{BaseColumns._ID, MusicPlaybackColumns.INDEX_IN_QUEUE, "expected_path", "expected_uri"},
                 null, null, null, null, "rowid")) {
             while (cursor.moveToNext()) {
-                Song song = catalog.get(cursor.getLong(0));
                 String path = cursor.getString(2);
                 String uri = cursor.getString(3);
+                Song song = path.isEmpty() ? null : catalog.get(SongSource.canonicalPath(path));
                 if (song == null) {
                     // Keep the stored identity so a later refresh can still
                     // resolve the entry instead of dropping it.
-                    song = new Song(cursor.getLong(0), "", 0, 0, 0, path, 0, 0, 0, "", new ArrayList<>());
-                    song.contentUri = uri;
-                } else if ((!path.isEmpty()
-                        && !SongSource.canonicalPath(path).equals(SongSource.canonicalPath(song.data)))
-                        || (!uri.isEmpty() && !song.contentUri.isEmpty() && !uri.equals(song.contentUri))) {
-                    // The stored reference points at a different source than the
-                    // catalog now holds. Keep the stored identity so a later
-                    // refresh can still resolve it instead of discarding it.
                     song = new Song(cursor.getLong(0), "", 0, 0, 0, path, 0, 0, 0, "", new ArrayList<>());
                     song.contentUri = uri;
                 }
                 queue.add(new IndexedSong(song, cursor.getInt(1), IndexedSong.INVALID_INDEX));
             }
         }
-        // Renumber the restored entries so the indexes stay a valid permutation
-        // even if a stored row was skipped.
-        for (int i = 0; i < queue.size(); i++) queue.get(i).index = i;
+        // Close gaps after confirmed deletion without losing the saved shuffle mapping.
+        java.util.TreeSet<Integer> priorIndexes = new java.util.TreeSet<>();
+        for (IndexedSong song : queue) priorIndexes.add(song.index);
+        Map<Integer, Integer> compacted = new java.util.HashMap<>();
+        for (int index : priorIndexes) compacted.put(index, compacted.size());
+        for (IndexedSong song : queue) song.index = compacted.get(song.index);
         return queue;
     }
 

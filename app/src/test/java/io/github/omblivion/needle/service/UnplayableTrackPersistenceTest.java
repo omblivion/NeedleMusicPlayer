@@ -66,9 +66,9 @@ public class UnplayableTrackPersistenceTest {
         @Override void requestSkipOfUnplayableTrack() {skipRequests++;}
         @Override void notifyChange(String what) {}
         @Override public void play() {}
-        @Override boolean openTrackAndPrepareNextAt(int position) {
+        @Override OpenResult openTrackAndPrepareNextAt(int position) {
             setPositionForTest(position);
-            return !failOpen || position != 0;
+            return failOpen && position == 0 ? OpenResult.PLAYER_FAILED : OpenResult.OPENED;
         }
     }
 

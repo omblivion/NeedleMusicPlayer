@@ -35,6 +35,7 @@ public class Song implements Parcelable {
     @NonNull
     @NonNls
     public final String data;
+    private volatile String canonicalCatalogPath;
     public final long dateAdded;
     public final long dateModified;
     @NonNull
@@ -85,6 +86,7 @@ public class Song implements Parcelable {
         albumId = song.albumId;
         artistNames = new ArrayList<>(song.artistNames);
         data = song.data;
+        canonicalCatalogPath = song.canonicalCatalogPath;
         dateAdded = song.dateAdded;
         dateModified = song.dateModified;
         contentUri = song.contentUri;
@@ -103,6 +105,16 @@ public class Song implements Parcelable {
         title = song.title;
         trackNumber = song.trackNumber;
         year = song.year;
+    }
+
+    @NonNull
+    public String getCanonicalCatalogPath() {
+        String path = canonicalCatalogPath;
+        if (path == null) {
+            path = SongSource.canonicalPath(data);
+            canonicalCatalogPath = path;
+        }
+        return path;
     }
 
     @NonNull

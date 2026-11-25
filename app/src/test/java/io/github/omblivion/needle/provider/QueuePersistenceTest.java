@@ -121,6 +121,8 @@ public class QueuePersistenceTest {
             assertEquals(7, cursor.getLong(0));
             assertEquals(1, cursor.getInt(1));
         }
+        addToCatalog(song(7, "/Music/new-owner.mp3"));
+        assertEquals("", store.getSavedPlayingQueue().get(0).data);
     }
 
     @Test public void coldQueueRestoreLoadsCommittedCatalogBeforeResolvingEntries() {

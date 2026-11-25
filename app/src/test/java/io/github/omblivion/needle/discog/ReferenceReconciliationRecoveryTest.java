@@ -5,6 +5,8 @@ import static org.junit.Assert.*;
 import io.github.omblivion.needle.App;
 import io.github.omblivion.needle.model.Song;
 import io.github.omblivion.needle.provider.*;
+import io.github.omblivion.needle.R;
+import io.github.omblivion.needle.util.MusicUtil;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -14,6 +16,9 @@ import org.robolectric.annotation.Config;
 import org.robolectric.util.ReflectionHelpers;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34, application = App.class)
@@ -25,6 +30,42 @@ public class ReferenceReconciliationRecoveryTest {
         ReflectionHelpers.setStaticField(MusicPlaybackQueueStore.class, "sInstance", null);
         ReflectionHelpers.setStaticField(UnplayableTrackStore.class, "instance", null);
         ReferenceReconciliationJournal.applyGate = ReferenceReconciliationJournal.ApplyGate.NONE;
+    }
+
+    @Test public void playbackReadsStayResponsiveWhileReferencePublicationIsStalled() throws Exception {
+        Discography discography = App.getDiscography();
+        var context = RuntimeEnvironment.getApplication();
+        Song a = LibraryReferenceReconciliationTest.song(1, "a");
+        discography.publishSnapshot(new LibrarySnapshot(List.of(a), 0));
+        new StaticPlaylist(context.getString(R.string.favorites)).addSongs(List.of(a));
+        Song moved = LibraryReferenceReconciliationTest.song(2, "a");
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ReferenceReconciliationJournal.applyGate = () -> {
+            entered.countDown();
+            try {
+                assertTrue(release.await(15, TimeUnit.SECONDS));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            }
+        };
+        var threads = Executors.newFixedThreadPool(3);
+        var publication = threads.submit(() ->
+                discography.publishSnapshot(new LibrarySnapshot(List.of(moved), 1)));
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var favorite = threads.submit(() -> MusicUtil.isFavorite(context, a));
+            var visible = threads.submit(() -> discography.getSong(1));
+            assertTrue("Favorite indicator must not wait for publication",
+                    favorite.get(2, TimeUnit.SECONDS));
+            assertEquals("Readers keep the previous catalog until publication completes",
+                    1, visible.get(2, TimeUnit.SECONDS).id);
+        } finally {
+            release.countDown();
+            threads.shutdown();
+            publication.get(5, TimeUnit.SECONDS);
+        }
     }
 
     @Test public void interruptedSwapRecoversExactlyOnce() {
@@ -64,6 +105,18 @@ public class ReferenceReconciliationRecoveryTest {
         assertEquals(2, new StaticPlaylist("Keep").asSongs().get(0).id);
         try (ReferenceReconciliationJournal journal = new ReferenceReconciliationJournal()) {
             assertNull(journal.read());
+        }
+    }
+
+    @Test public void journalCanReadSnapshotLargerThanOneCursorWindow() {
+        Song a = LibraryReferenceReconciliationTest.song(1, "a");
+        a.title = "x".repeat(1_100_000);
+        try (ReferenceReconciliationJournal journal = new ReferenceReconciliationJournal()) {
+            String operation = journal.begin(new LibrarySnapshot(List.of(a), 1));
+            var pending = journal.read();
+            assertNotNull(pending);
+            assertEquals(operation, pending.operation);
+            assertEquals(a.title, pending.snapshot.songs.get(1L).title);
         }
     }
 

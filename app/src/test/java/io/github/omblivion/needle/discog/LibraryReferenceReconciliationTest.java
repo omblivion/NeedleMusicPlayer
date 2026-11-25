@@ -44,7 +44,8 @@ public class LibraryReferenceReconciliationTest {
         stats.recordPlay(new io.github.omblivion.needle.provider.ReferenceKey(1, "/Music/a.mp3"),
                 System.currentTimeMillis(), "occurrence", 0);
         stats.getWritableDatabase().execSQL("UPDATE play_count_stats SET total_count=17, reset_version=4");
-        stats.getWritableDatabase().execSQL("INSERT INTO legacy_week VALUES (1, 2000, 9)");
+        stats.getWritableDatabase().execSQL("INSERT INTO legacy_week VALUES (1, 2000, 9, ?)",
+                new String[]{new io.github.omblivion.needle.provider.ReferenceKey(1, "/Music/a.mp3").path()});
         discography.publishSnapshot(new LibrarySnapshot(List.of(song(9, "a")), 1));
         assertEquals(2, new StaticPlaylist("Keep").asSongs().size());
         assertEquals(9, new StaticPlaylist("Keep").asSongs().get(0).id);
@@ -93,6 +94,21 @@ public class LibraryReferenceReconciliationTest {
         // must not follow the numeric ID onto the new file.
         discography.publishSnapshot(new LibrarySnapshot(List.of(song(1, "unrelated")), 1));
         assertTrue(new StaticPlaylist("Keep").asSongs().isEmpty());
+    }
+
+    @Test public void unfavoritingARecycledIdDoesNotRemoveAnotherPathsFavorite() {
+        var context = RuntimeEnvironment.getApplication();
+        Song old = song(7, "absent");
+        Song current = song(7, "current");
+        var music = new Object() {
+            void toggle(Song track) { io.github.omblivion.needle.util.MusicUtil.toggleFavorite(context, track); }
+            boolean favorite(Song track) { return io.github.omblivion.needle.util.MusicUtil.isFavorite(context, track); }
+        };
+        music.toggle(old);
+        music.toggle(current);
+        music.toggle(current);
+        assertTrue(music.favorite(old));
+        assertFalse(music.favorite(current));
     }
 
     @Test public void confirmedUserDeletionCleansReferencesButTagInvalidationDoesNot() {

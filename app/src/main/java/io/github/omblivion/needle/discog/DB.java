@@ -14,6 +14,10 @@ import io.github.omblivion.needle.util.OopsHandler;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -158,6 +162,44 @@ class DB extends SQLiteOpenHelper {
         try {
             db.delete(SongColumns.NAME, null, null);
             for (Song song : songs) db.insertOrThrow(SongColumns.NAME, null, valuesFor(song));
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    record Delta(Set<Long> removed, List<Song> upserted) {
+        boolean isEmpty() { return removed.isEmpty() && upserted.isEmpty(); }
+    }
+
+    Delta changes(Map<Long, Song> previous, Collection<Song> next) {
+        Set<Long> removed = new HashSet<>(previous.keySet());
+        List<Song> upserted = new ArrayList<>();
+        for (Song song : next) {
+            removed.remove(song.id);
+            Song old = previous.get(song.id);
+            if (old != song && (old == null || !valuesFor(old).equals(valuesFor(song)))) {
+                upserted.add(song);
+            }
+        }
+        return new Delta(removed, upserted);
+    }
+
+    synchronized void applyDelta(Delta delta) {
+        if (delta.isEmpty()) return;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (long id : delta.removed()) {
+                db.delete(SongColumns.NAME, SongColumns.ID + "=?", new String[]{Long.toString(id)});
+            }
+            for (Song song : delta.upserted()) {
+                ContentValues values = valuesFor(song);
+                if (db.update(SongColumns.NAME, values, SongColumns.ID + "=?",
+                        new String[]{Long.toString(song.id)}) == 0) {
+                    db.insertOrThrow(SongColumns.NAME, null, values);
+                }
+            }
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();

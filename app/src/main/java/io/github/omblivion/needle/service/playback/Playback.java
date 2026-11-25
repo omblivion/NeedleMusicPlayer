@@ -9,6 +9,12 @@ public interface Playback {
 
     boolean setDataSource(String path);
 
+    enum SourceResult { OPENED, UNAVAILABLE, DECODER_FAILED }
+
+    default SourceResult openDataSource(String path) {
+        return setDataSource(path) ? SourceResult.OPENED : SourceResult.DECODER_FAILED;
+    }
+
     void setNextDataSource(@Nullable String path);
 
     default void setNextDataSource(@Nullable String path, long sourceToken) {

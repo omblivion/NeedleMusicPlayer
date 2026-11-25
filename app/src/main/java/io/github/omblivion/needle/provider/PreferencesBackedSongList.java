@@ -70,21 +70,15 @@ abstract class SongList {
     private List<? extends Song> readSongs() {
         load();
         ArrayList<Song> result = new ArrayList<>();
-        ArrayList<Long> orphanIds = new ArrayList<>();
 
         // Since the song list is decoupled from Discography, we need to check its content
         // against the valid songs in discog. Resolution is by path only: a numeric
         // ID is never used, so a recycled provider ID cannot claim another track's
         // reference. An entry whose path is temporarily absent is simply not shown.
-        final Map<Long, Song> availableSongsById = Discography.getInstance().getAllSongsById();
-        final Map<String, Song> availableByPath = new java.util.HashMap<>();
-        for (Song song : availableSongsById.values()) {
-            availableByPath.put(io.github.omblivion.needle.model.SongSource.canonicalPath(song.data), song);
-        }
+        final Map<String, Song> availableByPath = Discography.getInstance().getSongsByCanonicalPath();
         for (final io.github.omblivion.needle.provider.ReferenceKey entry : entries) {
             if (entry.path().isEmpty()) continue;
-            Song matchingSong = availableByPath.get(
-                    io.github.omblivion.needle.model.SongSource.canonicalPath(entry.path()));
+            Song matchingSong = availableByPath.get(entry.path());
             if (matchingSong != null) {
                 result.add(matchingSong);
             }
@@ -108,10 +102,12 @@ abstract class MutableSongList extends SongList {
         });
     }
 
-    public void removeSong(long id) {
+    public void removeSong(@NonNull Song song) {
+        String path = song.getCanonicalCatalogPath();
+        if (path.isEmpty()) return;
         io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
         load();
-        entries.removeIf(entry -> entry.id() == id);
+        entries.removeIf(entry -> entry.path().equals(path));
         save(null);
         return null;
         });
@@ -175,6 +171,31 @@ public class PreferencesBackedSongList extends MutableSongList {
             preferences = PreferenceManager.getDefaultSharedPreferences(App.getStaticContext());
         }
         return preferences;
+    }
+
+    /** Read-only path membership for playback UI; no catalog or journal access. */
+    public static boolean containsStoredPath(@NonNull String name, @NonNull String path) {
+        if (path.isEmpty()) return false;
+        String values = getPreferences().getString(PREF_NAME_PREFIX + name, "");
+        if (values.isEmpty()) return false;
+        for (String token : values.split(SEPARATOR)) {
+            int separator = token.indexOf(':');
+            if (separator > 0 && path.equals(token.substring(separator + 1))) return true;
+        }
+        return false;
+    }
+
+    public static void toggleStoredSong(@NonNull String name, @NonNull Song song) {
+        String path = song.getCanonicalCatalogPath();
+        if (path.isEmpty()) return;
+        io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
+            PreferencesBackedSongList list = new PreferencesBackedSongList(name);
+            if (!list.entries.removeIf(entry -> entry.path().equals(path))) {
+                list.entries.add(ReferenceKey.of(song));
+            }
+            list.save(null);
+            return null;
+        });
     }
 
     /** Every reference key stored across all app-owned song lists. */

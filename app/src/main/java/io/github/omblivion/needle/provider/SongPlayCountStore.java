@@ -44,7 +44,7 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
     private static SongPlayCountStore sInstance = null;
 
     public static final String DATABASE_NAME = "song_play_count.db";
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
 
     // How many epoch weeks the default (52w) view exposes legacy buckets for.
     private static final int LEGACY_WEEKS = 52;
@@ -53,9 +53,6 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     // Dated events are kept this long; all-time totals are kept indefinitely.
     private static final long EVENT_RETENTION_MS = 400L * 24L * 60L * 60L * 1000L;
-
-    @NonNull
-    private static final String WHERE_ID_EQUALS = Columns.STATS + "." + Columns.ID + "=?";
 
     public SongPlayCountStore(final Context context) {
         super(context, DATABASE_NAME, null, VERSION);
@@ -79,16 +76,11 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(@NonNull final SQLiteDatabase db, final int oldVersion, final int newVersion) {
-        // Never call the old destructive upgrade. Add the new tables and the
-        // path column, and import the recoverable weekly buckets exactly once.
-        createStatsTable(db);
-        createEventsTable(db);
-        createLegacyWeeksTable(db);
         if (oldVersion < 4) {
+            onCreate(db);
             importLegacyWeeks(db);
-        }
-        if (oldVersion < 5) {
-            addPathColumn(db);
+        } else if (oldVersion < 6) {
+            migratePathOwnership(db);
         }
     }
 
@@ -99,10 +91,12 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     private static void createStatsTable(@NonNull SQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS " + Columns.STATS + " ("
-                + Columns.ID + " LONG PRIMARY KEY, "
+                + Columns.ID + " LONG NOT NULL, "
                 + Columns.TOTAL_COUNT + " LONG NOT NULL DEFAULT 0, "
                 + Columns.RESET_VERSION + " LONG NOT NULL DEFAULT 0, "
-                + Columns.PATH + " TEXT NOT NULL DEFAULT '')");
+                + Columns.PATH + " TEXT NOT NULL DEFAULT '', "
+                + "PRIMARY KEY(song_id, path))");
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_stats_path ON play_count_stats(path) WHERE path<>''");
     }
 
     /** Non-destructive: existing counts survive with an empty path. */
@@ -118,7 +112,10 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
                 + Columns.ID + " LONG NOT NULL, "
                 + Columns.OCCURRED_AT + " LONG NOT NULL, "
                 + Columns.OCCURRENCE + " TEXT NOT NULL, "
-                + "UNIQUE(" + Columns.ID + ", " + Columns.OCCURRENCE + "))");
+                + Columns.PATH + " TEXT NOT NULL DEFAULT '', "
+                + "UNIQUE(song_id, path, occurrence))");
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_event_path_occurrence"
+                + " ON play_event(path, occurrence) WHERE path<>''");
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_play_event_occurred ON "
                 + Columns.EVENTS + "(" + Columns.OCCURRED_AT + ")");
     }
@@ -128,7 +125,41 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
                 + Columns.ID + " LONG NOT NULL, "
                 + Columns.WEEK_INDEX + " INT NOT NULL, "
                 + Columns.LEGACY_COUNT + " INT NOT NULL DEFAULT 0, "
-                + "UNIQUE(" + Columns.ID + ", " + Columns.WEEK_INDEX + "))");
+                + Columns.PATH + " TEXT NOT NULL DEFAULT '', "
+                + "UNIQUE(song_id, path, week_index))");
+    }
+
+    /**
+     * v5 did not store paths on dated events or weekly buckets, and provider
+     * IDs may have been reused. Preserve those rows without guessing ownership.
+     */
+    private void migratePathOwnership(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS play_count_stats (song_id LONG PRIMARY KEY,"
+                + "total_count LONG NOT NULL DEFAULT 0, reset_version LONG NOT NULL DEFAULT 0)");
+        addPathColumn(db);
+        boolean haveEvents = tableHasColumn(db, Columns.EVENTS, Columns.ID);
+        boolean haveWeeks = tableHasColumn(db, Columns.LEGACY_WEEKS, Columns.ID);
+        db.execSQL("ALTER TABLE play_count_stats RENAME TO prior_stats");
+        if (haveEvents) {
+            db.execSQL("DROP INDEX IF EXISTS idx_play_event_occurred");
+            db.execSQL("ALTER TABLE play_event RENAME TO prior_events");
+        }
+        if (haveWeeks) db.execSQL("ALTER TABLE legacy_week RENAME TO prior_weeks");
+        onCreate(db);
+        db.execSQL("INSERT INTO play_count_stats(song_id,total_count,reset_version,path)"
+                + " SELECT MAX(song_id),SUM(total_count),MAX(reset_version),path FROM prior_stats"
+                + " GROUP BY path, CASE WHEN path='' THEN song_id END");
+        if (haveEvents) {
+            db.execSQL("INSERT INTO play_event(song_id,occurred_at,occurrence)"
+                    + " SELECT song_id,occurred_at,occurrence FROM prior_events");
+            db.execSQL("DROP TABLE prior_events");
+        }
+        if (haveWeeks) {
+            db.execSQL("INSERT INTO legacy_week(song_id,week_index,legacy_count)"
+                    + " SELECT song_id,week_index,legacy_count FROM prior_weeks");
+            db.execSQL("DROP TABLE prior_weeks");
+        }
+        db.execSQL("DROP TABLE prior_stats");
     }
 
     /**
@@ -274,12 +305,14 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         final SQLiteDatabase database = getWritableDatabase();
         database.beginTransaction();
         try {
-            if (resetVersion < getResetVersionInternal(database, songId)) {
+            long currentVersion = getResetVersionInternal(database, key);
+            if (resetVersion < currentVersion) {
                 return;
             }
 
             ContentValues event = new ContentValues(3);
             event.put(Columns.ID, songId);
+            event.put(Columns.PATH, key.path());
             event.put(Columns.OCCURRED_AT, timestampMs);
             event.put(Columns.OCCURRENCE, occurrence);
             long inserted = database.insertWithOnConflict(
@@ -290,13 +323,12 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
             }
 
             ContentValues stats = new ContentValues(3);
-            stats.put(Columns.TOTAL_COUNT, getTotalCountInternal(database, songId) + 1);
-            stats.put(Columns.RESET_VERSION, getResetVersionInternal(database, songId));
+            stats.put(Columns.TOTAL_COUNT, getTotalCountInternal(database, key) + 1);
+            stats.put(Columns.RESET_VERSION, currentVersion);
             stats.put(Columns.PATH, key.path());
-            if (database.update(Columns.STATS, stats, Columns.ID + "=?",
-                    new String[] {String.valueOf(songId)}) == 0) {
-                stats.put(Columns.ID, songId);
-                database.insert(Columns.STATS, null, stats);
+            stats.put(Columns.ID, songId);
+            if (database.update(Columns.STATS, stats, ownerWhere(key), ownerArgs(key)) == 0) {
+                database.insertOrThrow(Columns.STATS, null, stats);
             }
             database.setTransactionSuccessful();
         } finally {
@@ -310,28 +342,32 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
      * storage and playback are not touched.
      */
     public void resetSong(final long songId) {
+        resetSong(new ReferenceKey(songId, ""));
+    }
+
+    public void resetSong(@NonNull ReferenceKey key) {
         io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() -> {
-            resetSongInternal(songId);
+            resetSongInternal(key);
             return null;
         });
     }
 
-    private void resetSongInternal(long songId) {
+    private void resetSongInternal(ReferenceKey key) {
         final SQLiteDatabase database = getWritableDatabase();
         database.beginTransaction();
         try {
-            long nextVersion = getResetVersionInternal(database, songId) + 1;
+            long nextVersion = getResetVersionInternal(database, key) + 1;
 
-            database.delete(Columns.EVENTS, Columns.ID + "=?", new String[] {String.valueOf(songId)});
-            database.delete(Columns.LEGACY_WEEKS, Columns.ID + "=?", new String[] {String.valueOf(songId)});
+            database.delete(Columns.EVENTS, ownerWhere(key), ownerArgs(key));
+            database.delete(Columns.LEGACY_WEEKS, ownerWhere(key), ownerArgs(key));
 
             ContentValues stats = new ContentValues(3);
-            stats.put(Columns.ID, songId);
+            stats.put(Columns.ID, key.id());
+            stats.put(Columns.PATH, key.path());
             stats.put(Columns.TOTAL_COUNT, 0L);
             stats.put(Columns.RESET_VERSION, nextVersion);
-            if (database.update(Columns.STATS, stats, Columns.ID + "=?",
-                    new String[] {String.valueOf(songId)}) == 0) {
-                database.insert(Columns.STATS, null, stats);
+            if (database.update(Columns.STATS, stats, ownerWhere(key), ownerArgs(key)) == 0) {
+                database.insertOrThrow(Columns.STATS, null, stats);
             }
             database.setTransactionSuccessful();
         } finally {
@@ -341,20 +377,32 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
 
     /** @return the song's persistent reset version, or 0 when never reset. */
     public long getResetVersion(final long songId) {
-        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
-                getResetVersionInternal(getReadableDatabase(), songId));
+        return getResetVersion(new ReferenceKey(songId, ""));
     }
 
-    private static long getResetVersionInternal(@NonNull SQLiteDatabase database, long songId) {
+    public long getResetVersion(@NonNull ReferenceKey key) {
+        return io.github.omblivion.needle.discog.ReferenceReconciliationJournal.access(() ->
+                getResetVersionInternal(getReadableDatabase(), key));
+    }
+
+    private static String ownerWhere(ReferenceKey key) {
+        return key.path().isEmpty() ? "path='' AND song_id=?" : "path=?";
+    }
+
+    private static String[] ownerArgs(ReferenceKey key) {
+        return new String[]{key.path().isEmpty() ? Long.toString(key.id()) : key.path()};
+    }
+
+    private static long getResetVersionInternal(@NonNull SQLiteDatabase database, ReferenceKey key) {
         try (Cursor cursor = database.query(Columns.STATS, new String[] {Columns.RESET_VERSION},
-                Columns.ID + "=?", new String[] {String.valueOf(songId)}, null, null, null)) {
+                 ownerWhere(key), ownerArgs(key), null, null, null)) {
             return cursor.moveToFirst() ? cursor.getLong(0) : 0L;
         }
     }
 
-    private static long getTotalCountInternal(@NonNull SQLiteDatabase database, long songId) {
+    private static long getTotalCountInternal(@NonNull SQLiteDatabase database, ReferenceKey key) {
         try (Cursor cursor = database.query(Columns.STATS, new String[] {Columns.TOTAL_COUNT},
-                Columns.ID + "=?", new String[] {String.valueOf(songId)}, null, null, null)) {
+                 ownerWhere(key), ownerArgs(key), null, null, null)) {
             return cursor.moveToFirst() ? cursor.getLong(0) : 0L;
         }
     }
@@ -397,7 +445,7 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         final SQLiteDatabase database = getReadableDatabase();
 
         if (window == TopTracksWindow.ALL_TIME) {
-            return database.rawQuery("SELECT " + Columns.ID + " AS " + Columns.ID
+            return database.rawQuery("SELECT " + Columns.ID + ", " + Columns.PATH
                     + ", " + Columns.TOTAL_COUNT + " AS " + Columns.PLAY_COUNT
                     + " FROM " + Columns.STATS + " WHERE " + Columns.TOTAL_COUNT + " > 0"
                     + " ORDER BY " + Columns.TOTAL_COUNT + " DESC, " + Columns.ID + " ASC"
@@ -409,17 +457,18 @@ public class SongPlayCountStore extends SQLiteOpenHelper {
         int oldestLegacyWeek = currentEpochWeek(nowMillis) - LEGACY_WEEKS + 1;
 
         String legacySelect = includeLegacy
-                ? " UNION ALL SELECT " + Columns.ID + ", " + Columns.LEGACY_COUNT + " FROM "
+                ? " UNION ALL SELECT " + Columns.ID + ", " + Columns.PATH + ", " + Columns.LEGACY_COUNT + " FROM "
                         + Columns.LEGACY_WEEKS + " WHERE " + Columns.WEEK_INDEX + " >= " + oldestLegacyWeek
                 : "";
 
-        String sql = "SELECT " + Columns.ID + ", SUM(" + Columns.PLAY_COUNT + ") AS " + Columns.PLAY_COUNT
+        String sql = "SELECT MAX(" + Columns.ID + ") AS " + Columns.ID + ", " + Columns.PATH
+                + ", SUM(" + Columns.PLAY_COUNT + ") AS " + Columns.PLAY_COUNT
                 + " FROM ("
-                + "SELECT " + Columns.ID + ", COUNT(*) AS " + Columns.PLAY_COUNT
+                + "SELECT " + Columns.ID + ", " + Columns.PATH + ", COUNT(*) AS " + Columns.PLAY_COUNT
                 + " FROM " + Columns.EVENTS + " WHERE " + Columns.OCCURRED_AT + " >= " + cutoff
-                + " GROUP BY " + Columns.ID
+                + " GROUP BY " + Columns.ID + ", " + Columns.PATH
                 + legacySelect
-                + ") GROUP BY " + Columns.ID
+                + ") GROUP BY path, CASE WHEN path='' THEN song_id END"
                 + " HAVING " + Columns.PLAY_COUNT + " > 0"
                 + " ORDER BY " + Columns.PLAY_COUNT + " DESC, " + Columns.ID + " ASC"
                 + limitClause(numResults);

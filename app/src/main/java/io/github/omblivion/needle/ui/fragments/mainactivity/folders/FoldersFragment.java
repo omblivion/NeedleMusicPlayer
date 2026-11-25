@@ -3,7 +3,6 @@ package io.github.omblivion.needle.ui.fragments.mainactivity.folders;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
-import android.content.Intent;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
@@ -42,7 +41,6 @@ import io.github.omblivion.needle.misc.DialogAsyncTask;
 import io.github.omblivion.needle.misc.UpdateToastMediaScannerCompletionListener;
 import io.github.omblivion.needle.misc.WrappedAsyncTaskLoader;
 import io.github.omblivion.needle.model.Song;
-import io.github.omblivion.needle.service.MusicService;
 import io.github.omblivion.needle.sort.FileSortOrder;
 import io.github.omblivion.needle.sort.SortOrder;
 import io.github.omblivion.needle.ui.activities.MainActivity;
@@ -300,8 +298,7 @@ public class FoldersFragment
         } else if (itemId == R.id.action_scan) {
             final BreadCrumbLayout.Crumb crumb = getActiveCrumb();
             if (crumb != null) {
-                new ListPathsAsyncTask(getActivity(), this::scanPaths)
-                        .execute(new ListPathsAsyncTask.LoadingInfo(crumb.getFile(), AUDIO_FILE_FILTER));
+                 scanPaths(new String[]{crumb.getFile().getPath()});
             }
             return true;
         }
@@ -392,15 +389,11 @@ public class FoldersFragment
                     PreferenceUtil.getInstance().setStartDirectory(file);
                     SafeToast.show(requireActivity(), String.format(getString(R.string.new_start_directory), file.getPath()));
                     
-                    // Rescan if whitelist enabled
-                    if (PreferenceUtil.getInstance().getWhitelistEnabled()) {
-                        requireContext().sendBroadcast(new Intent(MusicService.MEDIA_STORE_CHANGED).setPackage(requireContext().getPackageName()));
-                    }  
+                    io.github.omblivion.needle.discog.Discography.getInstance().triggerSyncWithMediaStore(false);
                   
                     return true;
                 } else if (itemId == R.id.action_scan) {
-                    new ListPathsAsyncTask(getActivity(), this::scanPaths)
-                            .execute(new ListPathsAsyncTask.LoadingInfo(file, AUDIO_FILE_FILTER));
+                    scanPaths(new String[]{file.getPath()});
                     return true;
                 }
                 return false;
