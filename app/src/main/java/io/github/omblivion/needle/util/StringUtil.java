@@ -83,6 +83,11 @@ public class StringUtil {
     }
 
     @NonNull
+    public static String normalizeForSearch(@NonNull String text) {
+        return stripAccent(unicodeNormalize(text).toLowerCase(java.util.Locale.ROOT));
+    }
+
+    @NonNull
     public static String join(@NonNull String... s) {
         StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < s.length; i++) {

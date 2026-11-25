@@ -24,15 +24,10 @@ public class AlbumLoader {
 
     @NonNull
     public static ArrayList<Album> getAlbums(String query) {
-        final String strippedQuery = StringUtil.stripAccent(query.toLowerCase());
-
-        ArrayList<Album> albums = new ArrayList<>();
-        for (Album album : Discography.getInstance().getAllAlbums(getSortOrder())) {
-            final String strippedAlbum = StringUtil.stripAccent(album.getTitle().toLowerCase());
-            if (strippedAlbum.contains(strippedQuery)) {
-                albums.add(album);
-            }
-        }
+        final String strippedQuery = StringUtil.normalizeForSearch(query);
+        ArrayList<Album> albums = Discography.getInstance().getMatchingAlbums(
+                title -> StringUtil.normalizeForSearch(title).contains(strippedQuery));
+        albums.sort(getSortOrder());
         return albums;
     }
 

@@ -24,15 +24,16 @@ public class SongLoader {
 
     @NonNull
     public static ArrayList<Song> getSongs(@NonNull final String query) {
-        final String strippedQuery = StringUtil.stripAccent(query.toLowerCase());
+        final String strippedQuery = StringUtil.normalizeForSearch(query);
 
         ArrayList<Song> songs = new ArrayList<>();
-        for (Song song : Discography.getInstance().getAllSongs(getSortOrder())) {
-            final String strippedTitle = StringUtil.stripAccent(song.title.toLowerCase());
+        for (Song song : Discography.getInstance().getAllSongs(null)) {
+            final String strippedTitle = StringUtil.normalizeForSearch(song.title);
             if (strippedTitle.contains(strippedQuery)) {
                 songs.add(song);
             }
         }
+        songs.sort(getSortOrder());
         return songs;
     }
 

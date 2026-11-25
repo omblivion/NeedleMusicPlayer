@@ -24,15 +24,16 @@ public class ArtistLoader {
 
     @NonNull
     public static ArrayList<Artist> getArtists(String query) {
-        final String strippedQuery = StringUtil.stripAccent(query.toLowerCase());
+        final String strippedQuery = StringUtil.normalizeForSearch(query);
 
         ArrayList<Artist> artists = new ArrayList<>();
-        for (Artist artist : Discography.getInstance().getAllArtists(getSortOrder())) {
-            final String strippedArtist = StringUtil.stripAccent(artist.getName().toLowerCase());
+        for (Artist artist : Discography.getInstance().getAllArtists(null)) {
+            final String strippedArtist = StringUtil.normalizeForSearch(artist.getName());
             if (strippedArtist.contains(strippedQuery)) {
                 artists.add(artist);
             }
         }
+        artists.sort(getSortOrder());
         return artists;
     }
 

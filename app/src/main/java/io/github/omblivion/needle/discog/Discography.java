@@ -49,7 +49,7 @@ public class Discography implements MusicServiceEventListener {
     private final DB database = new DB();
     private final MemCache cache = new MemCache();
     private volatile Map<String, Song> songsByCanonicalPath = Map.of();
-    private long revision;
+    private volatile long revision;
     private final Object coordinatorLock = new Object();
     private LibraryScanCoordinator scanCoordinator;
     private final LibraryRemovalTracker removalTracker = new LibraryRemovalTracker();
@@ -104,9 +104,7 @@ public class Discography implements MusicServiceEventListener {
     }
 
     public long getRevision() {
-        synchronized (cache) {
-            return revision;
-        }
+        return revision;
     }
 
     public void publishSnapshot(@NonNull LibrarySnapshot snapshot) {
@@ -363,14 +361,14 @@ public class Discography implements MusicServiceEventListener {
     }
 
     @NonNull
-    public ArrayList<Artist> getAllArtists(@NonNull Comparator<Artist> sortOrder) {
+    public ArrayList<Artist> getAllArtists(@Nullable Comparator<Artist> sortOrder) {
         synchronized (cache) {
             // Make a copy here, to avoid error while the caller is iterating on the result
             ArrayList<Artist> copy = new ArrayList<>(cache.artistsById.values());
 
             // Perform sort inside the critical section, to avoid data race
             // (artist or album being modified while sorting)
-            Collections.sort(copy, sortOrder);
+            if (sortOrder != null) Collections.sort(copy, sortOrder);
             return copy;
         }
     }
@@ -412,6 +410,28 @@ public class Discography implements MusicServiceEventListener {
         // Maintain sorted album after merge
         Collections.sort(fullAlbum.songs, SongSortOrder.BY_DISC_TRACK);
         return fullAlbum;
+    }
+
+    /** Materialize only albums whose titles may match the search. */
+    public ArrayList<Album> getMatchingAlbums(Predicate<String> titleMatches) {
+        ArrayList<Album> matches = new ArrayList<>();
+        synchronized (cache) {
+            for (Map<Long, MemCache.AlbumSlice> parts : cache.albumsByAlbumIdAndArtistId.values()) {
+                boolean likelyMatch = false;
+                for (MemCache.AlbumSlice part : parts.values()) {
+                    // Slices already use the same track order as the merged album.
+                    if (titleMatches.test(part.getTitle())) {
+                        likelyMatch = true;
+                        break;
+                    }
+                }
+                if (likelyMatch) {
+                    Album album = mergeFullAlbum(parts.values());
+                    if (titleMatches.test(album.getTitle())) matches.add(album);
+                }
+            }
+        }
+        return matches;
     }
 
     @NonNull
@@ -803,6 +823,7 @@ public class Discography implements MusicServiceEventListener {
             cache.replaceWith(loaded.prepared);
             songsByCanonicalPath = loaded.songsByPath;
             cache.consistencyState = MemCache.ConsistencyState.OK;
+            if (!loaded.songs.isEmpty()) revision++;
         }
         notifyDiscographyChanged();
     }
