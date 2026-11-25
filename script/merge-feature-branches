@@ -132,7 +132,7 @@ for alien_branch in ${alien_branches}; do
 done
 
 # Patch the changelog
-cat > app/src/main/assets/CHANGELOG.md << END
+cat > CHANGELOG.md << END
 Integration build from branch \`${CI_BRANCH}\`, with merges from the following:
 ${last_commits}
 

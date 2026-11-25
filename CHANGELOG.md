@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## Needle [0.3.1] - 2026-11-25
 
+**Do not use Needle 0.3.0.** It can leave the library empty and freeze the app when playback and scanning overlap. Upgrade to 0.3.1 in place; do not uninstall or clear app data.
+
+- Show already indexed tracks on first import while Needle reads tags in the background.
+- Keep search responsive while typing or indexing by filtering before sorting and refreshing results only after the catalog changes.
 - Keep playback and search responsive while the library scan prepares or publishes changes.
 - Use the selected start folder as the recursive library root. Automatic scans write only changed catalog rows, and an incomplete explicit rescan leaves the previous catalog available.
 - Keep playlist membership, history, and play counts attached to their paths even if a file goes offline or Android reuses its ID. Older ID-only data remains stored without guessing its owner.

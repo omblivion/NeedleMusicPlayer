@@ -32,6 +32,21 @@ licenses {
     }
 }
 
+abstract class GenerateChangelogAsset extends DefaultTask {
+    @InputFile
+    abstract RegularFileProperty getChangelog()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+
+    @TaskAction
+    void generate() {
+        File asset = outputDirectory.file('CHANGELOG.md').get().asFile
+        asset.parentFile.mkdirs()
+        asset.bytes = changelog.get().asFile.bytes
+    }
+}
+
 android {
     compileSdk 37
     namespace 'io.github.omblivion.needle'
@@ -42,8 +57,8 @@ android {
         vectorDrawables.useSupportLibrary = true
 
         applicationId 'io.github.omblivion.needle'
-        versionCode 4
-        versionName '0.3.0'
+        versionCode 5
+        versionName '0.3.1'
 
         multiDexEnabled true
     }
@@ -119,6 +134,16 @@ android {
         // Track inherited debt explicitly; new findings still fail CI.
         baseline = file('lint-baseline.xml')
         disable 'MissingTranslation', 'InvalidPackage'
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def generate = tasks.register("generate${variant.name.capitalize()}ChangelogAsset", GenerateChangelogAsset) {
+            changelog.set(rootProject.layout.projectDirectory.file('CHANGELOG.md'))
+            outputDirectory.set(layout.buildDirectory.dir("generated/needle/changelog-assets/${variant.name}"))
+        }
+        variant.sources.assets.addGeneratedSourceDirectory(generate) { it.outputDirectory }
     }
 }
 
