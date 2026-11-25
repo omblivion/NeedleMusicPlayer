@@ -552,6 +552,8 @@ public class Discography implements MusicServiceEventListener {
         }
         long baseRevision = getRevision();
         Map<Long, Song> previous = getAllSongsById();
+        boolean indexedPreview = discovery != null && !complete && !targeted
+                && !forceMetadata && previous.isEmpty();
         ArrayList<Song> candidate = new ArrayList<>();
 
         final String selectedRoot = targeted ? SongSource.canonicalPath(
@@ -586,7 +588,14 @@ public class Discography implements MusicServiceEventListener {
             String versionKey = song.contentUri + "|" + song.data + "|" + song.sourceSize
                     + "|" + song.sourceGeneration + "|" + song.dateModified + "|" + song.providerVersion;
             int attempts = forceMetadata ? 0 : metadataAttempts.getOrDefault(versionKey, 0);
-            if (!forceMetadata && existing != null && (!existing.metadataRetryNeeded || attempts >= 3)
+            if (indexedPreview) {
+                // The provider metadata is enough to show and play an indexed
+                // track. Read tags in the later pass, not on the startup path.
+                matchedSong = new Song(song);
+                matchedSong.metadataRetryNeeded = true;
+                normalizeSong(matchedSong);
+                counters.added++;
+            } else if (!forceMetadata && existing != null && (!existing.metadataRetryNeeded || attempts >= 3)
                     && existing.data.equals(song.data) && existing.contentUri.equals(song.contentUri)
                     && existing.dateModified == song.dateModified
                     && !SongSource.from(existing).versionChanged(SongSource.from(song))) {

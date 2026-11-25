@@ -40,6 +40,24 @@ public class LibraryImportIntegrationTest {
         exercise(true);
     }
 
+    @Test public void initialImportPublishesIndexedSongsBeforeReadingIndividualTags() throws Exception {
+        File root = Files.createTempDirectory("needle-initial").toFile();
+        File nested = new File(root, "album/track.mp3");
+        assertTrue(nested.getParentFile().mkdirs());
+        Files.write(nested.toPath(), new byte[]{1});
+        var provider = new ImportProvider();
+        provider.file = nested;
+        provider.id = 1;
+        ShadowContentResolver.registerProviderInternal("media", provider);
+        Discography discography = App.getDiscography();
+        var discovery = new LibraryFileDiscovery(List.of()).discover(List.of(root));
+        // An ordinary incomplete scan is the same pre-index situation: indexed
+        // songs are usable immediately, without per-track tag or URI queries.
+        discography.syncWithMediaStore(p -> {}, false, discovery, false);
+        assertEquals("Provider title", discography.getSong(1).title);
+        assertEquals(0, provider.trackQueries);
+    }
+
     @Test public void automaticRefreshDoesNotRewriteUnchangedRows() throws Exception {
         File root = Files.createTempDirectory("needle-library").toFile();
         File one = new File(root, "one.mp3");
@@ -259,11 +277,13 @@ public class LibraryImportIntegrationTest {
         long size = -1;
         boolean present = true;
         boolean includePathless;
+        int trackQueries;
         @Override public boolean onCreate() { return true; }
         @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) {
             MatrixCursor cursor = new MatrixCursor(projection);
             if (!present) return cursor;
             if (args != null) {
+                trackQueries++;
                 if (file.getPath().equals(args[0])) addRow(cursor, projection, file, id, size);
                 else if (otherFile != null && otherFile.getPath().equals(args[0])) {
                     addRow(cursor, projection, otherFile, 100, -1);
@@ -272,6 +292,7 @@ public class LibraryImportIntegrationTest {
             }
             String last = uri.getLastPathSegment();
             if (last != null && last.matches("\\d+")) {
+                trackQueries++;
                 if (last.equals(Long.toString(id))) addRow(cursor, projection, file, id, size);
                 else if (last.equals("100") && otherFile != null) addRow(cursor, projection, otherFile, 100, -1);
                 return cursor;

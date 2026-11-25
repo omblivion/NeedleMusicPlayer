@@ -180,6 +180,12 @@ public final class LibraryScanCoordinator {
             discovery = new LibraryFileDiscovery(BlacklistStore.getInstance(context).getPaths()).discover(roots);
             if (roots.isEmpty()) discovery.complete = false;
             List<String> paths = new ArrayList<>();
+            if (request.roots.isEmpty() && !request.forceRebuild && !discovery.files.isEmpty()
+                    && discography.getSongsByCanonicalPath().isEmpty() && scopeIsCurrent()) {
+                var preview = discography.syncWithMediaStore(p -> {}, false, discovery, false, false,
+                        this::scopeIsCurrent);
+                Log.i("LibraryScan", "Initial indexed tracks available: " + preview.added);
+            }
             Map<String, Song> catalog = new HashMap<>();
             for (Song song : discography.getAllSongs(null)) {
                 catalog.put(SongSource.canonicalPath(song.data), song);
@@ -191,6 +197,8 @@ public final class LibraryScanCoordinator {
                         || (last == null ? !entry.getValue().matches(existing)
                                          : !entry.getValue().sameVersion(last))) paths.add(entry.getKey());
             }
+            Log.d("LibraryScan", "Discovered " + discovery.files.size() + " audio files, "
+                    + paths.size() + " require MediaStore indexing");
             if (request.roots.isEmpty() && discovery.complete) updateObservers(discovery.directories);
             return paths;
         }
